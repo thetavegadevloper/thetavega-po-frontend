@@ -37,27 +37,214 @@ export const MASTER_CONFIGS = {
     ],
     initial: { registeredAddress: { country: "India" }, bankDetails: {}, isActive: true },
   },
-  vendors: {
-    title: "Vendor Master", singular: "Vendor", endpoint: "/vendors", readPermission: "vendor.read", writePermission: "vendor.write",
-    searchPlaceholder: "Vendor name, code or GST",
-    columns: [["vendorCode", "Code"], ["vendorName", "Vendor"], ["purchaseType", "Purchase Type"], ["gstNo", "GST No"], ["currency", "Currency"]],
-    fields: [
-      { name: "vendorCode", label: "Vendor Code", required: true },
-      { name: "vendorName", label: "Vendor Name", required: true },
-      { name: "purchaseType", label: "Purchase Type", type: "select", options: ["Domestic", "Import"], required: true },
-      { name: "currency", label: "Currency", required: true },
-      { name: "gstNo", label: "GST No" }, { name: "panNo", label: "PAN No" },
-      ...addressFields,
-      { name: "bankName", label: "Bank Name" }, { name: "accountNo", label: "Account No" },
-      { name: "ifsc", label: "IFSC" }, { name: "bankAddress", label: "Bank Address", col: 12 },
-      { name: "contacts.0.type", label: "Primary Contact Type", type: "select", options: ["Sales", "Service", "Logistics", "Support", "Accounts", "Management", "Other"] },
-      { name: "contacts.0.name", label: "Primary Contact Name" },
-      { name: "contacts.0.phone", label: "Primary Contact Phone" },
-      { name: "contacts.0.email", label: "Primary Contact Email", type: "email" },
+vendors: {
+  title: "Vendor Master",
+  singular: "Vendor",
+  endpoint: "/vendors",
+
+  readPermission: "vendor.read",
+  writePermission: "vendor.write",
+
+  searchPlaceholder: "Vendor name, code or GST",
+
+  // =====================================================
+  // VENDOR MASTER TABLE
+  // =====================================================
+  columns: [
+    ["vendorCode", "Code"],
+    ["vendorName", "Vendor"],
+    ["purchaseType", "Purchase Type"],
+    ["gstNo", "GST No"],
+    ["panNo", "PAN No"],
+    ["gstCertificate.originalName", "GST Certificate"],
+    ["panCard.originalName", "PAN Card"],
+    ["supportingFiles", "Supporting Files"],
+    ["currency", "Currency"]
+  ],
+
+  // =====================================================
+  // ADD / EDIT VENDOR FORM
+  // =====================================================
+  fields: [
+    {
+      name: "vendorCode",
+      label: "Vendor Code",
+      required: true
+    },
+
+    {
+      name: "vendorName",
+      label: "Vendor Name",
+      required: true
+    },
+
+    {
+      name: "purchaseType",
+      label: "Purchase Type",
+      type: "select",
+      options: [
+        "Domestic",
+        "Import"
+      ],
+      required: true
+    },
+
+    {
+      name: "currency",
+      label: "Currency",
+      required: true
+    },
+
+    // =====================================================
+    // GST DETAILS
+    // =====================================================
+    {
+      name: "gstNo",
+      label: "GST No"
+    },
+
+    {
+      name: "gstCertificate",
+      label: "GST Certificate",
+      type: "file",
+      accept: ".pdf,.jpg,.jpeg,.png"
+    },
+
+    // =====================================================
+    // PAN DETAILS
+    // =====================================================
+    {
+      name: "panNo",
+      label: "PAN No"
+    },
+
+    {
+      name: "panCard",
+      label: "PAN Card",
+      type: "file",
+      accept: ".pdf,.jpg,.jpeg,.png"
+    },
+
+    // =====================================================
+    // SUPPORTING FILES
+    // =====================================================
+    {
+      name: "supportingFiles",
+      label: "Supporting Files",
+      type: "file",
+      multiple: true,
+      accept: ".pdf,.jpg,.jpeg,.png,.xls,.xlsx",
+      col: 12
+    },
+
+    // =====================================================
+    // ADDRESS
+    // =====================================================
+    ...addressFields,
+
+    // =====================================================
+    // BANK DETAILS
+    // =====================================================
+    {
+      name: "bankName",
+      label: "Bank Name"
+    },
+
+    {
+      name: "accountNo",
+      label: "Account No"
+    },
+
+    {
+      name: "ifsc",
+      label: "IFSC"
+    },
+
+    {
+      name: "bankAddress",
+      label: "Bank Address",
+      col: 12
+    },
+
+    // =====================================================
+    // PRIMARY CONTACT
+    // =====================================================
+    {
+      name: "contacts.0.type",
+      label: "Primary Contact Type",
+      type: "select",
+      options: [
+        "Sales",
+        "Service",
+        "Logistics",
+        "Support",
+        "Accounts",
+        "Management",
+        "Other"
+      ]
+    },
+
+    {
+      name: "contacts.0.name",
+      label: "Primary Contact Name"
+    },
+
+    {
+      name: "contacts.0.phone",
+      label: "Primary Contact Phone"
+    },
+
+    {
+      name: "contacts.0.email",
+      label: "Primary Contact Email",
+      type: "email"
+    }
+  ],
+
+  // =====================================================
+  // INITIAL VALUES
+  // =====================================================
+  initial: {
+    purchaseType: "Domestic",
+
+    currency: "INR",
+
+    gstNo: "",
+    gstCertificate: null,
+
+    panNo: "",
+    panCard: null,
+
+    supportingFiles: [],
+
+    registeredAddress: {
+      country: "India"
+    },
+
+    contacts: [
+      {
+        type: "Sales",
+        name: "",
+        phone: "",
+        email: ""
+      }
     ],
-    initial: { purchaseType: "Domestic", currency: "INR", registeredAddress: { country: "India" }, contacts: [{ type: "Sales", name: "", phone: "", email: "" }], isActive: true },
-    clean: (data) => ({ ...data, contacts: data.contacts?.[0]?.name ? data.contacts : [] }),
+
+    isActive: true
   },
+
+  // =====================================================
+  // CLEAN BEFORE SAVE
+  // =====================================================
+  clean: (data) => ({
+    ...data,
+
+    contacts:
+      data.contacts?.[0]?.name
+        ? data.contacts
+        : []
+  })
+},
  materials: {
   title: "Material Master",
   singular: "Material",

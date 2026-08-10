@@ -19,7 +19,6 @@ import { masterApi } from "../../api/masterApi";
 import { poApi } from "../../api/poApi";
 
 import {
-  CHARGE_MODES,
   PO_TYPES
 } from "../../constants";
 
@@ -42,8 +41,6 @@ const emptyItem = () => ({
   uom: "",
 
   qty: 1,
-
-  // Rate will auto-fill from Material Master
   rate: 0,
 
   gstPercent: 0,
@@ -54,6 +51,30 @@ const emptyItem = () => ({
 
   manual: false
 });
+
+// =====================================================
+// PAYMENT SPECIFIC TERM IDENTIFICATION
+// =====================================================
+function isPaymentSpecificTerm(term) {
+  const title = String(
+    term?.title || ""
+  )
+    .trim()
+    .toLowerCase();
+
+  const category = String(
+    term?.category || ""
+  )
+    .trim()
+    .toLowerCase();
+
+  return (
+    title === "payment terms" ||
+    title === "payment term" ||
+    category === "payment" ||
+    category === "payment terms"
+  );
+}
 
 // =====================================================
 // INITIAL FORM
@@ -67,48 +88,25 @@ const initial = {
   costCenterId: "",
   projectId: "",
 
-  // ==========================================
-  // PAYMENT MASTER
-  // ==========================================
   paymentTermId: "",
 
-  // ==========================================
-  // AUTO FROM VENDOR MASTER
-  // Not displayed to user
-  // ==========================================
   purchaseType: "Domestic",
   currency: "INR",
 
-  // ==========================================
-  // PO TYPE
-  // ==========================================
   poType: "Project",
 
-  // ==========================================
-  // AUTO GENERATED
-  // Not displayed to user
-  // ==========================================
   documentHeading: "DOMESTIC PURCHASE ORDER",
 
   header: {
     quoteRefDocumentNo: "",
-
     documentType: "Email Quote",
-
     confirmedBy: "",
-
     projectDocumentNo: "",
-
     referenceNo: "",
 
-    // ======================================
-    // DO NOT SHOW MANUAL FIELD
-    // Value comes from Payment Terms Master
-    // ======================================
     paymentSummary: "",
 
     buyerName: "",
-
     buyerContact: "",
 
     taxesDutiesText:
@@ -118,21 +116,12 @@ const initial = {
       "Supplier to ensure the Appropriate HSN & applicable Tax Rates as per applicable law.",
 
     specialNotes: "",
-
     authorizedSignatory: ""
   },
 
   items: [
     emptyItem()
   ],
-
-  charges: {
-    packingMode: "At Actual",
-    packingValue: 0,
-
-    freightMode: "At Actual",
-    freightValue: 0
-  },
 
   roundingOff: 0,
 
@@ -242,7 +231,7 @@ export default function POFormPage() {
     );
 
   // ===================================================
-  // SPECIFIC PO TERMS
+  // SPECIFIC PO TERMS MASTER
   // ===================================================
 
   const terms =
@@ -255,7 +244,7 @@ export default function POFormPage() {
     );
 
   // ===================================================
-  // EXISTING PO FOR EDIT
+  // EXISTING PO
   // ===================================================
 
   const existing =
@@ -272,7 +261,7 @@ export default function POFormPage() {
     });
 
   // ===================================================
-  // EDIT MODE INITIALIZATION
+  // EDIT INITIALIZATION
   // ===================================================
 
   useEffect(() => {
@@ -286,7 +275,9 @@ export default function POFormPage() {
 
       setForm({
         poDate:
-          yyyyMmDd(po.poDate),
+          yyyyMmDd(
+            po.poDate
+          ),
 
         companyId:
           po.company?.companyId ||
@@ -311,9 +302,6 @@ export default function POFormPage() {
             ?.projectId ||
           "",
 
-        // =====================================
-        // PAYMENT TERM
-        // =====================================
         paymentTermId:
           po.paymentTerm
             ?.paymentTermId ||
@@ -333,12 +321,10 @@ export default function POFormPage() {
 
         documentHeading:
           po.documentHeading ||
-          `${
-            String(
-              po.purchaseType ||
-              "Domestic"
-            ).toUpperCase()
-          } PURCHASE ORDER`,
+          `${String(
+            po.purchaseType ||
+            "Domestic"
+          ).toUpperCase()} PURCHASE ORDER`,
 
         header: {
           ...initial.header,
@@ -348,33 +334,32 @@ export default function POFormPage() {
         items:
           (
             po.items || []
-          ).map((item) => ({
-            ...item,
+          ).map(
+            (item) => ({
+              ...item,
 
-            materialId:
-              item.materialId ||
-              "",
+              materialId:
+                item.materialId ||
+                "",
 
-            deliveryDate:
-              item.deliveryDate
-                ? yyyyMmDd(
-                    item.deliveryDate
-                  )
-                : "",
+              deliveryDate:
+                item.deliveryDate
+                  ? yyyyMmDd(
+                      item.deliveryDate
+                    )
+                  : "",
 
-            manual:
-              !item.materialId
-          })),
-
-        charges: {
-          ...initial.charges,
-          ...po.charges
-        },
+              manual:
+                !item.materialId
+            })
+          ),
 
         roundingOff:
-          po.totals
-            ?.roundingOff ||
-          0,
+          Number(
+            po.totals
+              ?.roundingOff ||
+            0
+          ),
 
         specificTerms:
           po.specificTerms ||
@@ -390,7 +375,7 @@ export default function POFormPage() {
   ]);
 
   // ===================================================
-  // AUTO BUYER FROM LOGGED-IN USER
+  // AUTO BUYER
   // ===================================================
 
   useEffect(() => {
@@ -399,19 +384,23 @@ export default function POFormPage() {
       !form.header.buyerName &&
       user
     ) {
-      setForm((current) => ({
-        ...current,
+      setForm(
+        (current) => ({
+          ...current,
 
-        header: {
-          ...current.header,
+          header: {
+            ...current.header,
 
-          buyerName:
-            user.name || "",
+            buyerName:
+              user.name ||
+              "",
 
-          buyerContact:
-            user.mobile || ""
-        }
-      }));
+            buyerContact:
+              user.mobile ||
+              ""
+          }
+        })
+      );
     }
   }, [
     editing,
@@ -421,6 +410,10 @@ export default function POFormPage() {
 
   // ===================================================
   // LOAD DEFAULT SPECIFIC TERMS
+  //
+  // If Payment Term is already selected,
+  // automatically populate Payment Terms
+  // inside Specific PO Terms.
   // ===================================================
 
   useEffect(() => {
@@ -429,43 +422,56 @@ export default function POFormPage() {
       terms.data?.data?.length &&
       !form.specificTerms.length
     ) {
-      setForm((current) => ({
-        ...current,
+      setForm(
+        (current) => {
+          const paymentSummary =
+            current.header
+              .paymentSummary ||
+            "";
 
-        specificTerms:
-          terms.data.data.map(
-            (term) => ({
-              termId:
-                term._id,
+          return {
+            ...current,
 
-              termCode:
-                term.termCode,
+            specificTerms:
+              terms.data.data.map(
+                (term) => ({
+                  termId:
+                    term._id,
 
-              category:
-                term.category,
+                  termCode:
+                    term.termCode,
 
-              title:
-                term.title,
+                  category:
+                    term.category,
 
-              text:
-                term.text,
+                  title:
+                    term.title,
 
-              displayOrder:
-                term.displayOrder,
+                  text:
+                    isPaymentSpecificTerm(
+                      term
+                    ) &&
+                    paymentSummary
+                      ? paymentSummary
+                      : term.text,
 
-              mandatory:
-                term.mandatory,
+                  displayOrder:
+                    term.displayOrder,
 
-              canOverride:
-                term.canOverride,
+                  mandatory:
+                    term.mandatory,
 
-              // Keep highlights when configured
-              highlights:
-                term.highlights ||
-                []
-            })
-          )
-      }));
+                  canOverride:
+                    term.canOverride,
+
+                  highlights:
+                    term.highlights ||
+                    []
+                })
+              )
+          };
+        }
+      );
     }
   }, [
     editing,
@@ -474,7 +480,7 @@ export default function POFormPage() {
   ]);
 
   // ===================================================
-  // SAVE MUTATION
+  // SAVE
   // ===================================================
 
   const save =
@@ -491,10 +497,12 @@ export default function POFormPage() {
               requestPayload
             ),
 
-      onSuccess: (response) => {
+      onSuccess: (
+        response
+      ) => {
         toast.success(
           editing
-            ? "PO updated"
+            ? "PO updated successfully"
             : "PO draft created"
         );
 
@@ -503,15 +511,19 @@ export default function POFormPage() {
         );
       },
 
-      onError: (error) => {
+      onError: (
+        error
+      ) => {
         toast.error(
-          getApiError(error)
+          getApiError(
+            error
+          )
         );
       }
     });
 
   // ===================================================
-  // MATERIAL LOOKUP MAP
+  // MATERIAL MAP
   // ===================================================
 
   const materialMap =
@@ -519,14 +531,17 @@ export default function POFormPage() {
       () =>
         new Map(
           (
-            materials.data?.data ||
+            materials.data
+              ?.data ||
             []
-          ).map((material) => [
-            String(
-              material._id
-            ),
-            material
-          ])
+          ).map(
+            (material) => [
+              String(
+                material._id
+              ),
+              material
+            ]
+          )
         ),
       [
         materials.data
@@ -543,66 +558,70 @@ export default function POFormPage() {
   ) {
     const material =
       materialMap.get(
-        String(materialId)
+        String(
+          materialId
+        )
       );
 
-    setForm((current) => {
-      const items = [
-        ...current.items
-      ];
+    setForm(
+      (current) => {
+        const items = [
+          ...current.items
+        ];
 
-      items[index] =
-        material
-          ? {
-              ...items[index],
+        items[index] =
+          material
+            ? {
+                ...items[
+                  index
+                ],
 
-              materialId:
-                material._id,
+                materialId:
+                  material._id,
 
-              materialCode:
-                material.itemCode,
+                materialCode:
+                  material.itemCode,
 
-              description:
-                material.description,
+                description:
+                  material.description,
 
-              hsnSac:
-                material.hsnSacCode,
+                hsnSac:
+                  material.hsnSacCode,
 
-              uom:
-                material.uom,
+                uom:
+                  material.uom,
 
-              gstPercent:
-                Number(
-                  material.gstPercent ||
-                  0
-                ),
+                gstPercent:
+                  Number(
+                    material.gstPercent ||
+                    0
+                  ),
 
-              tdsPercent:
-                Number(
-                  material.tdsPercent ||
-                  0
-                ),
+                tdsPercent:
+                  Number(
+                    material.tdsPercent ||
+                    0
+                  ),
 
-              // =================================
-              // RATE AUTO FROM MATERIAL MASTER
-              // =================================
-              rate:
-                Number(
-                  material.rate ||
-                  0
-                ),
+                rate:
+                  Number(
+                    material.rate ||
+                    0
+                  ),
 
-              manual: false
-            }
-          : {
-              ...emptyItem()
-            };
+                manual:
+                  false
+              }
+            : {
+                ...emptyItem()
+              };
 
-      return {
-        ...current,
-        items
-      };
-    });
+        return {
+          ...current,
+          items
+        };
+      }
+    );
   }
 
   // ===================================================
@@ -613,42 +632,53 @@ export default function POFormPage() {
     index,
     patch
   ) {
-    setForm((current) => {
-      const items = [
-        ...current.items
-      ];
+    setForm(
+      (current) => {
+        const items = [
+          ...current.items
+        ];
 
-      items[index] = {
-        ...items[index],
-        ...patch
-      };
+        items[index] = {
+          ...items[index],
+          ...patch
+        };
 
-      return {
-        ...current,
-        items
-      };
-    });
+        return {
+          ...current,
+          items
+        };
+      }
+    );
   }
 
   // ===================================================
   // REMOVE ITEM
   // ===================================================
 
-  function removeItem(index) {
-    setForm((current) => ({
-      ...current,
+  function removeItem(
+    index
+  ) {
+    setForm(
+      (current) => ({
+        ...current,
 
-      items:
-        current.items.length === 1
-          ? [
-              emptyItem()
-            ]
-          : current.items.filter(
-              (_, itemIndex) =>
-                itemIndex !==
-                index
-            )
-    }));
+        items:
+          current.items
+            .length ===
+          1
+            ? [
+                emptyItem()
+              ]
+            : current.items.filter(
+                (
+                  _,
+                  itemIndex
+                ) =>
+                  itemIndex !==
+                  index
+              )
+      })
+    );
   }
 
   // ===================================================
@@ -656,18 +686,55 @@ export default function POFormPage() {
   // ===================================================
 
   function addItem() {
-    setForm((current) => ({
-      ...current,
+    setForm(
+      (current) => ({
+        ...current,
 
-      items: [
-        ...current.items,
-        emptyItem()
-      ]
-    }));
+        items: [
+          ...current.items,
+          emptyItem()
+        ]
+      })
+    );
   }
 
   // ===================================================
-  // FRONTEND CALCULATION PREVIEW
+  // UPDATE SPECIFIC TERM
+  // ===================================================
+
+  function updateSpecificTerm(
+    index,
+    value
+  ) {
+    setForm(
+      (current) => {
+        const updatedTerms = [
+          ...current.specificTerms
+        ];
+
+        updatedTerms[
+          index
+        ] = {
+          ...updatedTerms[
+            index
+          ],
+
+          text:
+            value
+        };
+
+        return {
+          ...current,
+
+          specificTerms:
+            updatedTerms
+        };
+      }
+    );
+  }
+
+  // ===================================================
+  // FRONTEND CALCULATION
   // ===================================================
 
   const calc =
@@ -677,10 +744,12 @@ export default function POFormPage() {
           (item) => {
             const basic =
               Number(
-                item.qty || 0
+                item.qty ||
+                0
               ) *
               Number(
-                item.rate || 0
+                item.rate ||
+                0
               );
 
             const tax =
@@ -721,74 +790,31 @@ export default function POFormPage() {
           0
         );
 
-      const charge = (
-        mode,
-        value
-      ) => {
-        if (
-          mode === "Fixed"
-        ) {
-          return Number(
-            value || 0
-          );
-        }
-
-        if (
-          mode === "Percent"
-        ) {
-          return (
-            sub *
-            Number(
-              value || 0
-            )
-          ) / 100;
-        }
-
-        return 0;
-      };
-
-      const packing =
-        charge(
-          form.charges
-            .packingMode,
-          form.charges
-            .packingValue
-        );
-
-      const freight =
-        charge(
-          form.charges
-            .freightMode,
-          form.charges
-            .freightValue
-        );
-
-      const total =
-        sub +
-        tax +
-        packing +
-        freight +
+      const rounding =
         Number(
           form.roundingOff ||
           0
         );
 
+      const total =
+        sub +
+        tax +
+        rounding;
+
       return {
         rows,
         sub,
         tax,
-        packing,
-        freight,
+        rounding,
         total
       };
     }, [
       form.items,
-      form.charges,
       form.roundingOff
     ]);
 
   // ===================================================
-  // BUILD API PAYLOAD
+  // API PAYLOAD
   // ===================================================
 
   function payload() {
@@ -812,16 +838,9 @@ export default function POFormPage() {
         form.projectId ||
         undefined,
 
-      // =======================================
-      // PAYMENT MASTER ID
-      // Backend resolves summary from master
-      // =======================================
       paymentTermId:
         form.paymentTermId,
 
-      // =======================================
-      // AUTO FROM VENDOR
-      // =======================================
       purchaseType:
         form.purchaseType,
 
@@ -834,8 +853,6 @@ export default function POFormPage() {
       documentHeading:
         form.documentHeading,
 
-      // header.paymentSummary is present
-      // internally, but backend is final authority
       header:
         form.header,
 
@@ -911,7 +928,6 @@ export default function POFormPage() {
                       item.qty
                     ),
 
-                  // Final PO rate
                   rate:
                     Number(
                       item.rate
@@ -928,26 +944,16 @@ export default function POFormPage() {
 
       charges: {
         packingMode:
-          form.charges
-            .packingMode,
+          "At Actual",
 
         packingValue:
-          Number(
-            form.charges
-              .packingValue ||
-            0
-          ),
+          0,
 
         freightMode:
-          form.charges
-            .freightMode,
+          "At Actual",
 
         freightValue:
-          Number(
-            form.charges
-              .freightValue ||
-            0
-          )
+          0
       },
 
       roundingOff:
@@ -965,12 +971,11 @@ export default function POFormPage() {
   // SUBMIT
   // ===================================================
 
-  function submit(event) {
+  function submit(
+    event
+  ) {
     event.preventDefault();
 
-    // ==========================================
-    // PAYMENT TERM REQUIRED
-    // ==========================================
     if (
       !form.paymentTermId
     ) {
@@ -979,9 +984,6 @@ export default function POFormPage() {
       );
     }
 
-    // ==========================================
-    // PROJECT REQUIRED FOR PROJECT PO
-    // ==========================================
     if (
       form.poType ===
         "Project" &&
@@ -992,9 +994,6 @@ export default function POFormPage() {
       );
     }
 
-    // ==========================================
-    // MATERIAL VALIDATION
-    // ==========================================
     const invalidItem =
       form.items.some(
         (item) =>
@@ -1005,7 +1004,9 @@ export default function POFormPage() {
             : !item.materialId
       );
 
-    if (invalidItem) {
+    if (
+      invalidItem
+    ) {
       return toast.error(
         "Select a material for every item"
       );
@@ -1030,32 +1031,38 @@ export default function POFormPage() {
   }
 
   // ===================================================
-  // EDIT STATUS VALIDATION
+  // EDIT STATUS
   // ===================================================
+
+  const currentPOStatus =
+    existing.data
+      ?.data
+      ?.status ||
+    "";
+
+  const lockedStatuses = [
+    "Cancelled",
+    "Closed"
+  ];
 
   if (
     editing &&
-    existing.data?.data
-      ?.status &&
-    ![
-      "Draft",
-      "Rejected"
-    ].includes(
-      existing.data.data
-        .status
+    currentPOStatus &&
+    lockedStatuses.includes(
+      currentPOStatus
     )
   ) {
     return (
       <Alert variant="warning">
-        Only Draft or Rejected PO
-        can be edited. Current
-        status:{" "}
+
+        This Purchase Order
+        cannot be edited.
+        Current status:{" "}
+
         <strong>
-          {
-            existing.data.data
-              .status
-          }
+          {currentPOStatus}
         </strong>
+
       </Alert>
     );
   }
@@ -1065,11 +1072,15 @@ export default function POFormPage() {
   // ===================================================
 
   return (
-    <Form onSubmit={submit}>
+    <Form
+      onSubmit={
+        submit
+      }
+    >
 
-      {/* ===============================================
+      {/* =================================================
           PAGE HEADER
-      =============================================== */}
+      ================================================= */}
 
       <PageHeader
         title={
@@ -1078,15 +1089,27 @@ export default function POFormPage() {
             : "Create Purchase Order"
         }
 
-        subtitle="The backend recalculates all amounts and stores master snapshots when the PO is saved."
+        subtitle={
+          editing
+            ? `Current Status: ${
+                currentPOStatus ||
+                "-"
+              }`
+            : "The backend recalculates all amounts and stores master snapshots when the PO is saved."
+        }
 
         actions={
           <>
+
             <Button
               type="button"
+
               variant="outline-secondary"
+
               onClick={() =>
-                navigate(-1)
+                navigate(
+                  -1
+                )
               }
             >
               Cancel
@@ -1094,47 +1117,55 @@ export default function POFormPage() {
 
             <Button
               type="submit"
+
               disabled={
                 save.isPending
               }
             >
+
               {save.isPending
                 ? "Saving..."
                 : editing
-                ? "Update Draft"
+                ? "Update PO"
                 : "Save Draft"}
+
             </Button>
+
           </>
         }
       />
 
-      {/* ===============================================
-          1. PO HEADER
-      =============================================== */}
+      {/* =================================================
+          1. PO HEADER & MASTER SELECTION
+      ================================================= */}
 
       <Card className="border-0 shadow-sm mb-3">
 
         <Card.Header className="bg-white fw-bold py-3">
+
           1. PO Header & Master Selection
+
         </Card.Header>
 
         <Card.Body>
 
           <Row className="g-3">
 
-            {/* PO DATE */}
-
             <Col md={3}>
+
               <Form.Label>
                 PO Date *
               </Form.Label>
 
               <Form.Control
                 type="date"
+
                 required
+
                 value={
                   form.poDate
                 }
+
                 onChange={(
                   event
                 ) =>
@@ -1142,16 +1173,17 @@ export default function POFormPage() {
                     ...form,
 
                     poDate:
-                      event.target
+                      event
+                        .target
                         .value
                   })
                 }
               />
+
             </Col>
 
-            {/* COMPANY */}
-
             <Col md={3}>
+
               <Form.Label>
                 Company *
               </Form.Label>
@@ -1170,28 +1202,37 @@ export default function POFormPage() {
                     ...form,
 
                     companyId:
-                      event.target
+                      event
+                        .target
                         .value
                   })
                 }
               >
+
                 <option value="">
                   Select
                 </option>
 
                 {(
-                  companies.data
-                    ?.data || []
+                  companies
+                    .data
+                    ?.data ||
+                  []
                 ).map(
-                  (company) => (
+                  (
+                    company
+                  ) => (
+
                     <option
                       key={
                         company._id
                       }
+
                       value={
                         company._id
                       }
                     >
+
                       {
                         company.companyCode
                       }{" "}
@@ -1199,15 +1240,18 @@ export default function POFormPage() {
                       {
                         company.companyName
                       }
+
                     </option>
+
                   )
                 )}
+
               </Form.Select>
+
             </Col>
 
-            {/* VENDOR */}
-
             <Col md={3}>
+
               <Form.Label>
                 Vendor *
               </Form.Label>
@@ -1222,17 +1266,22 @@ export default function POFormPage() {
                 onChange={(
                   event
                 ) => {
+
                   const vendorId =
-                    event.target
+                    event
+                      .target
                       .value;
 
                   const vendor =
                     (
-                      vendors.data
+                      vendors
+                        .data
                         ?.data ||
                       []
                     ).find(
-                      (item) =>
+                      (
+                        item
+                      ) =>
                         String(
                           item._id
                         ) ===
@@ -1259,36 +1308,41 @@ export default function POFormPage() {
 
                       vendorId,
 
-                      // AUTO FROM VENDOR
                       purchaseType,
 
-                      // AUTO FROM VENDOR
                       currency,
 
-                      // AUTO GENERATED
                       documentHeading:
                         `${purchaseType.toUpperCase()} PURCHASE ORDER`
                     })
                   );
                 }}
               >
+
                 <option value="">
                   Select
                 </option>
 
                 {(
-                  vendors.data
-                    ?.data || []
+                  vendors
+                    .data
+                    ?.data ||
+                  []
                 ).map(
-                  (vendor) => (
+                  (
+                    vendor
+                  ) => (
+
                     <option
                       key={
                         vendor._id
                       }
+
                       value={
                         vendor._id
                       }
                     >
+
                       {
                         vendor.vendorCode
                       }{" "}
@@ -1296,15 +1350,18 @@ export default function POFormPage() {
                       {
                         vendor.vendorName
                       }
+
                     </option>
+
                   )
                 )}
+
               </Form.Select>
+
             </Col>
 
-            {/* DELIVERY */}
-
             <Col md={3}>
+
               <Form.Label>
                 Delivery Address *
               </Form.Label>
@@ -1323,30 +1380,37 @@ export default function POFormPage() {
                     ...form,
 
                     deliveryAddressId:
-                      event.target
+                      event
+                        .target
                         .value
                   })
                 }
               >
+
                 <option value="">
                   Select
                 </option>
 
                 {(
-                  deliveries.data
-                    ?.data || []
+                  deliveries
+                    .data
+                    ?.data ||
+                  []
                 ).map(
                   (
                     delivery
                   ) => (
+
                     <option
                       key={
                         delivery._id
                       }
+
                       value={
                         delivery._id
                       }
                     >
+
                       {
                         delivery.deliveryCode
                       }{" "}
@@ -1354,15 +1418,18 @@ export default function POFormPage() {
                       {
                         delivery.name
                       }
+
                     </option>
+
                   )
                 )}
+
               </Form.Select>
+
             </Col>
 
-            {/* COST CENTER */}
-
             <Col md={3}>
+
               <Form.Label>
                 Cost Center *
               </Form.Label>
@@ -1381,30 +1448,37 @@ export default function POFormPage() {
                     ...form,
 
                     costCenterId:
-                      event.target
+                      event
+                        .target
                         .value
                   })
                 }
               >
+
                 <option value="">
                   Select
                 </option>
 
                 {(
-                  costCenters.data
-                    ?.data || []
+                  costCenters
+                    .data
+                    ?.data ||
+                  []
                 ).map(
                   (
                     costCenter
                   ) => (
+
                     <option
                       key={
                         costCenter._id
                       }
+
                       value={
                         costCenter._id
                       }
                     >
+
                       {
                         costCenter.costCenterCode
                       }{" "}
@@ -1412,15 +1486,18 @@ export default function POFormPage() {
                       {
                         costCenter.costCenterName
                       }
+
                     </option>
+
                   )
                 )}
+
               </Form.Select>
+
             </Col>
 
-            {/* PO TYPE */}
-
             <Col md={3}>
+
               <Form.Label>
                 PO Type *
               </Form.Label>
@@ -1439,31 +1516,43 @@ export default function POFormPage() {
                     ...form,
 
                     poType:
-                      event.target
+                      event
+                        .target
                         .value
                   })
                 }
               >
+
                 {PO_TYPES.map(
-                  (type) => (
+                  (
+                    type
+                  ) => (
+
                     <option
-                      key={type}
+                      key={
+                        type
+                      }
                     >
                       {type}
                     </option>
+
                   )
                 )}
+
               </Form.Select>
+
             </Col>
 
-            {/* PROJECT */}
-
             <Col md={3}>
+
               <Form.Label>
+
                 Project{" "}
+
                 {form.poType ===
                   "Project" &&
                   "*"}
+
               </Form.Label>
 
               <Form.Select
@@ -1479,17 +1568,22 @@ export default function POFormPage() {
                 onChange={(
                   event
                 ) => {
+
                   const projectId =
-                    event.target
+                    event
+                      .target
                       .value;
 
                   const project =
                     (
-                      projects.data
+                      projects
+                        .data
                         ?.data ||
                       []
                     ).find(
-                      (item) =>
+                      (
+                        item
+                      ) =>
                         String(
                           item._id
                         ) ===
@@ -1518,23 +1612,31 @@ export default function POFormPage() {
                   );
                 }}
               >
+
                 <option value="">
                   Select / Not applicable
                 </option>
 
                 {(
-                  projects.data
-                    ?.data || []
+                  projects
+                    .data
+                    ?.data ||
+                  []
                 ).map(
-                  (project) => (
+                  (
+                    project
+                  ) => (
+
                     <option
                       key={
                         project._id
                       }
+
                       value={
                         project._id
                       }
                     >
+
                       {
                         project.projectCode
                       }{" "}
@@ -1542,15 +1644,18 @@ export default function POFormPage() {
                       {
                         project.projectName
                       }
+
                     </option>
+
                   )
                 )}
+
               </Form.Select>
+
             </Col>
 
-            {/* CURRENCY */}
-
             <Col md={3}>
+
               <Form.Label>
                 Currency
               </Form.Label>
@@ -1567,34 +1672,40 @@ export default function POFormPage() {
                     ...form,
 
                     currency:
-                      event.target.value.toUpperCase()
+                      event
+                        .target
+                        .value
+                        .toUpperCase()
                   })
                 }
               />
+
             </Col>
 
           </Row>
 
         </Card.Body>
+
       </Card>
 
-      {/* ===============================================
-          2. COMMERCIAL DETAILS
-      =============================================== */}
+      {/* =================================================
+          2. COMMERCIAL / REFERENCE DETAILS
+      ================================================= */}
 
       <Card className="border-0 shadow-sm mb-3">
 
         <Card.Header className="bg-white fw-bold py-3">
+
           2. Commercial / Reference Details
+
         </Card.Header>
 
         <Card.Body>
 
           <Row className="g-3">
 
-            {/* QUOTE REFERENCE */}
-
             <Col md={4}>
+
               <Form.Label>
                 Quote Ref Document No.
               </Form.Label>
@@ -1615,17 +1726,18 @@ export default function POFormPage() {
                       ...form.header,
 
                       quoteRefDocumentNo:
-                        event.target
+                        event
+                          .target
                           .value
                     }
                   })
                 }
               />
+
             </Col>
 
-            {/* DOCUMENT TYPE */}
-
             <Col md={4}>
+
               <Form.Label>
                 Document Type
               </Form.Label>
@@ -1646,17 +1758,18 @@ export default function POFormPage() {
                       ...form.header,
 
                       documentType:
-                        event.target
+                        event
+                          .target
                           .value
                     }
                   })
                 }
               />
+
             </Col>
 
-            {/* CONFIRMED BY */}
-
             <Col md={4}>
+
               <Form.Label>
                 Confirmed By
               </Form.Label>
@@ -1677,17 +1790,18 @@ export default function POFormPage() {
                       ...form.header,
 
                       confirmedBy:
-                        event.target
+                        event
+                          .target
                           .value
                     }
                   })
                 }
               />
+
             </Col>
 
-            {/* PROJECT DOCUMENT */}
-
             <Col md={4}>
+
               <Form.Label>
                 Project Document No.
               </Form.Label>
@@ -1708,17 +1822,18 @@ export default function POFormPage() {
                       ...form.header,
 
                       projectDocumentNo:
-                        event.target
+                        event
+                          .target
                           .value
                     }
                   })
                 }
               />
+
             </Col>
 
-            {/* REFERENCE NUMBER */}
-
             <Col md={4}>
+
               <Form.Label>
                 Reference No.
               </Form.Label>
@@ -1739,21 +1854,27 @@ export default function POFormPage() {
                       ...form.header,
 
                       referenceNo:
-                        event.target
+                        event
+                          .target
                           .value
                     }
                   })
                 }
               />
+
             </Col>
 
-            {/* =========================================
-                PAYMENT TERM MASTER
+            {/* =================================================
+                PAYMENT TERM
 
-                Manual Payment Summary removed.
-            ========================================= */}
+                When selected:
+                1. paymentTermId changes
+                2. header.paymentSummary changes
+                3. Specific PO Terms -> Payment Terms changes
+            ================================================= */}
 
             <Col md={4}>
+
               <Form.Label>
                 Payment Term *
               </Form.Label>
@@ -1768,17 +1889,22 @@ export default function POFormPage() {
                 onChange={(
                   event
                 ) => {
+
                   const paymentTermId =
-                    event.target
+                    event
+                      .target
                       .value;
 
                   const selectedPayment =
                     (
                       paymentTerms
-                        .data?.data ||
+                        .data
+                        ?.data ||
                       []
                     ).find(
-                      (payment) =>
+                      (
+                        payment
+                      ) =>
                         String(
                           payment._id
                         ) ===
@@ -1786,6 +1912,11 @@ export default function POFormPage() {
                           paymentTermId
                         )
                     );
+
+                  const paymentSummary =
+                    selectedPayment
+                      ?.paymentSummary ||
+                    "";
 
                   setForm(
                     (
@@ -1795,41 +1926,66 @@ export default function POFormPage() {
 
                       paymentTermId,
 
-                      // Keep internally.
-                      // Backend will also
-                      // independently resolve it.
+                      // =====================================
+                      // HEADER PAYMENT
+                      // =====================================
+
                       header: {
                         ...current.header,
 
-                        paymentSummary:
-                          selectedPayment
-                            ?.paymentSummary ||
-                          ""
-                      }
+                        paymentSummary
+                      },
+
+                      // =====================================
+                      // SPECIFIC PO TERMS PAYMENT
+                      // AUTO UPDATE FROM SELECTED PAYMENT
+                      // =====================================
+
+                      specificTerms:
+                        current.specificTerms.map(
+                          (
+                            term
+                          ) =>
+                            isPaymentSpecificTerm(
+                              term
+                            )
+                              ? {
+                                  ...term,
+
+                                  text:
+                                    paymentSummary
+                                }
+                              : term
+                        )
                     })
                   );
                 }}
               >
+
                 <option value="">
                   Select Payment Term
                 </option>
 
                 {(
                   paymentTerms
-                    .data?.data ||
+                    .data
+                    ?.data ||
                   []
                 ).map(
                   (
                     payment
                   ) => (
+
                     <option
                       key={
                         payment._id
                       }
+
                       value={
                         payment._id
                       }
                     >
+
                       {
                         payment.paymentCode
                       }{" "}
@@ -1837,15 +1993,18 @@ export default function POFormPage() {
                       {
                         payment.paymentName
                       }
+
                     </option>
+
                   )
                 )}
+
               </Form.Select>
+
             </Col>
 
-            {/* BUYER NAME */}
-
             <Col md={4}>
+
               <Form.Label>
                 Buyer Name *
               </Form.Label>
@@ -1868,17 +2027,18 @@ export default function POFormPage() {
                       ...form.header,
 
                       buyerName:
-                        event.target
+                        event
+                          .target
                           .value
                     }
                   })
                 }
               />
+
             </Col>
 
-            {/* BUYER CONTACT */}
-
             <Col md={4}>
+
               <Form.Label>
                 Buyer Contact
               </Form.Label>
@@ -1899,17 +2059,18 @@ export default function POFormPage() {
                       ...form.header,
 
                       buyerContact:
-                        event.target
+                        event
+                          .target
                           .value
                     }
                   })
                 }
               />
+
             </Col>
 
-            {/* TAXES */}
-
             <Col md={4}>
+
               <Form.Label>
                 Taxes & Duties
               </Form.Label>
@@ -1930,17 +2091,18 @@ export default function POFormPage() {
                       ...form.header,
 
                       taxesDutiesText:
-                        event.target
+                        event
+                          .target
                           .value
                     }
                   })
                 }
               />
+
             </Col>
 
-            {/* SUPPLIER TAX NOTE */}
-
             <Col md={12}>
+
               <Form.Label>
                 Supplier Tax Note
               </Form.Label>
@@ -1961,23 +2123,25 @@ export default function POFormPage() {
                       ...form.header,
 
                       supplierTaxNote:
-                        event.target
+                        event
+                          .target
                           .value
                     }
                   })
                 }
               />
+
             </Col>
 
-            {/* SPECIAL NOTES */}
-
             <Col md={8}>
+
               <Form.Label>
                 Special Notes
               </Form.Label>
 
               <Form.Control
                 as="textarea"
+
                 rows={2}
 
                 value={
@@ -1995,17 +2159,18 @@ export default function POFormPage() {
                       ...form.header,
 
                       specialNotes:
-                        event.target
+                        event
+                          .target
                           .value
                     }
                   })
                 }
               />
+
             </Col>
 
-            {/* AUTHORIZED SIGNATORY */}
-
             <Col md={4}>
+
               <Form.Label>
                 Authorized Signatory
               </Form.Label>
@@ -2026,22 +2191,25 @@ export default function POFormPage() {
                       ...form.header,
 
                       authorizedSignatory:
-                        event.target
+                        event
+                          .target
                           .value
                     }
                   })
                 }
               />
+
             </Col>
 
           </Row>
 
         </Card.Body>
+
       </Card>
 
-      {/* ===============================================
+      {/* =================================================
           3. PO ITEMS
-      =============================================== */}
+      ================================================= */}
 
       <Card className="border-0 shadow-sm mb-3">
 
@@ -2053,14 +2221,20 @@ export default function POFormPage() {
 
           <Button
             type="button"
+
             size="sm"
+
             variant="outline-primary"
+
             onClick={
               addItem
             }
           >
+
             <i className="bi bi-plus-lg me-1" />
+
             Add Item
+
           </Button>
 
         </Card.Header>
@@ -2075,27 +2249,15 @@ export default function POFormPage() {
 
                 <tr>
 
-                  <th
-                    style={{
-                      minWidth: 55
-                    }}
-                  >
+                  <th style={{ minWidth: 55 }}>
                     Sr.
                   </th>
 
-                  <th
-                    style={{
-                      minWidth: 260
-                    }}
-                  >
+                  <th style={{ minWidth: 260 }}>
                     Material
                   </th>
 
-                  <th
-                    style={{
-                      minWidth: 260
-                    }}
-                  >
+                  <th style={{ minWidth: 260 }}>
                     Description
                   </th>
 
@@ -2107,19 +2269,11 @@ export default function POFormPage() {
                     UOM
                   </th>
 
-                  <th
-                    style={{
-                      minWidth: 110
-                    }}
-                  >
+                  <th style={{ minWidth: 110 }}>
                     Qty
                   </th>
 
-                  <th
-                    style={{
-                      minWidth: 140
-                    }}
-                  >
+                  <th style={{ minWidth: 140 }}>
                     Rate
                   </th>
 
@@ -2127,19 +2281,11 @@ export default function POFormPage() {
                     GST%
                   </th>
 
-                  <th
-                    style={{
-                      minWidth: 130
-                    }}
-                  >
+                  <th style={{ minWidth: 130 }}>
                     Basic
                   </th>
 
-                  <th
-                    style={{
-                      minWidth: 140
-                    }}
-                  >
+                  <th style={{ minWidth: 140 }}>
                     Delivery
                   </th>
 
@@ -2156,15 +2302,15 @@ export default function POFormPage() {
                     item,
                     index
                   ) => (
+
                     <tr
                       key={
                         index
                       }
                     >
 
-                      {/* SR */}
-
                       <td>
+
                         {
                           (
                             index +
@@ -2172,9 +2318,8 @@ export default function POFormPage() {
                           ) *
                           10
                         }
-                      </td>
 
-                      {/* MATERIAL */}
+                      </td>
 
                       <td>
 
@@ -2220,6 +2365,7 @@ export default function POFormPage() {
                               )
                             }
                           >
+
                             <option value="">
                               Select material
                             </option>
@@ -2233,14 +2379,17 @@ export default function POFormPage() {
                               (
                                 material
                               ) => (
+
                                 <option
                                   key={
                                     material._id
                                   }
+
                                   value={
                                     material._id
                                   }
                                 >
+
                                   {
                                     material.itemCode
                                   }{" "}
@@ -2248,9 +2397,12 @@ export default function POFormPage() {
                                   {
                                     material.description
                                   }
+
                                 </option>
+
                               )
                             )}
+
                           </Form.Select>
 
                         )}
@@ -2258,6 +2410,7 @@ export default function POFormPage() {
                         {can(
                           "po.manual_item"
                         ) && (
+
                           <Form.Check
                             className="mt-1"
 
@@ -2280,22 +2433,23 @@ export default function POFormPage() {
                                   .checked
                                   ? {
                                       ...emptyItem(),
+
                                       manual:
                                         true
                                     }
                                   : {
                                       ...emptyItem(),
+
                                       manual:
                                         false
                                     }
                               )
                             }
                           />
+
                         )}
 
                       </td>
-
-                      {/* DESCRIPTION */}
 
                       <td>
 
@@ -2303,6 +2457,7 @@ export default function POFormPage() {
 
                           <Form.Control
                             as="textarea"
+
                             rows={2}
 
                             value={
@@ -2327,17 +2482,17 @@ export default function POFormPage() {
                         ) : (
 
                           <div className="small">
+
                             {
                               item.description ||
                               "Select material"
                             }
+
                           </div>
 
                         )}
 
                       </td>
-
-                      {/* HSN */}
 
                       <td>
 
@@ -2364,13 +2519,13 @@ export default function POFormPage() {
                           />
 
                         ) : (
+
                           item.hsnSac ||
                           "-"
+
                         )}
 
                       </td>
-
-                      {/* UOM */}
 
                       <td>
 
@@ -2397,13 +2552,13 @@ export default function POFormPage() {
                           />
 
                         ) : (
+
                           item.uom ||
                           "-"
+
                         )}
 
                       </td>
-
-                      {/* QTY */}
 
                       <td>
 
@@ -2435,8 +2590,6 @@ export default function POFormPage() {
 
                       </td>
 
-                      {/* RATE */}
-
                       <td>
 
                         <Form.Control
@@ -2466,8 +2619,6 @@ export default function POFormPage() {
                         />
 
                       </td>
-
-                      {/* GST */}
 
                       <td>
 
@@ -2502,12 +2653,12 @@ export default function POFormPage() {
                           />
 
                         ) : (
+
                           item.gstPercent
+
                         )}
 
                       </td>
-
-                      {/* BASIC */}
 
                       <td className="text-end fw-semibold">
 
@@ -2520,8 +2671,6 @@ export default function POFormPage() {
                         )}
 
                       </td>
-
-                      {/* DELIVERY */}
 
                       <td>
 
@@ -2550,8 +2699,6 @@ export default function POFormPage() {
 
                       </td>
 
-                      {/* REMOVE */}
-
                       <td>
 
                         <Button
@@ -2567,12 +2714,15 @@ export default function POFormPage() {
                             )
                           }
                         >
+
                           <i className="bi bi-trash" />
+
                         </Button>
 
                       </td>
 
                     </tr>
+
                   )
                 )}
 
@@ -2583,24 +2733,23 @@ export default function POFormPage() {
           </div>
 
         </Card.Body>
+
       </Card>
 
-      {/* ===============================================
-          TERMS + TOTALS
-      =============================================== */}
+      {/* =================================================
+          4. SPECIFIC TERMS + 5. TOTAL PREVIEW
+      ================================================= */}
 
       <Row className="g-3 mb-3">
-
-        {/* =============================================
-            SPECIFIC TERMS
-        ============================================= */}
 
         <Col lg={7}>
 
           <Card className="border-0 shadow-sm h-100">
 
             <Card.Header className="bg-white fw-bold py-3">
+
               4. Specific PO Terms
+
             </Card.Header>
 
             <Card.Body>
@@ -2609,7 +2758,9 @@ export default function POFormPage() {
                 .length === 0 ? (
 
                 <div className="text-secondary">
-                  Active specific terms will be loaded automatically by the backend.
+
+                  Active specific terms will be loaded automatically.
+
                 </div>
 
               ) : (
@@ -2619,12 +2770,15 @@ export default function POFormPage() {
                     term,
                     index
                   ) => (
+
                     <div
-                      key={`${term.termCode}-${index}`}
+                      key={`${term.termCode || term.title}-${index}`}
+
                       className="mb-3"
                     >
 
                       <Form.Label className="fw-semibold">
+
                         {
                           term.displayOrder
                         }
@@ -2632,6 +2786,7 @@ export default function POFormPage() {
                         {
                           term.title
                         }
+
                       </Form.Label>
 
                       <Form.Control
@@ -2640,46 +2795,24 @@ export default function POFormPage() {
                         rows={2}
 
                         value={
-                          term.text
+                          term.text ||
+                          ""
                         }
 
                         onChange={(
                           event
                         ) =>
-                          setForm(
-                            (
-                              current
-                            ) => {
-                              const updatedTerms =
-                                [
-                                  ...current.specificTerms
-                                ];
-
-                              updatedTerms[
-                                index
-                              ] = {
-                                ...updatedTerms[
-                                  index
-                                ],
-
-                                text:
-                                  event
-                                    .target
-                                    .value
-                              };
-
-                              return {
-                                ...current,
-
-                                specificTerms:
-                                  updatedTerms
-                              };
-                            }
+                          updateSpecificTerm(
+                            index,
+                            event
+                              .target
+                              .value
                           )
                         }
                       />
 
                     </div>
+
                   )
                 )
 
@@ -2691,191 +2824,19 @@ export default function POFormPage() {
 
         </Col>
 
-        {/* =============================================
-            CHARGES AND TOTALS
-        ============================================= */}
-
         <Col lg={5}>
 
           <Card className="border-0 shadow-sm h-100">
 
             <Card.Header className="bg-white fw-bold py-3">
-              5. Charges & Total Preview
+
+              5. Total Preview
+
             </Card.Header>
 
             <Card.Body>
 
               <Row className="g-2 mb-3">
-
-                {/* PACKING MODE */}
-
-                <Col xs={6}>
-
-                  <Form.Label>
-                    Packing Mode
-                  </Form.Label>
-
-                  <Form.Select
-                    value={
-                      form.charges
-                        .packingMode
-                    }
-
-                    onChange={(
-                      event
-                    ) =>
-                      setForm({
-                        ...form,
-
-                        charges: {
-                          ...form.charges,
-
-                          packingMode:
-                            event
-                              .target
-                              .value
-                        }
-                      })
-                    }
-                  >
-                    {CHARGE_MODES.map(
-                      (mode) => (
-                        <option
-                          key={
-                            mode
-                          }
-                        >
-                          {mode}
-                        </option>
-                      )
-                    )}
-                  </Form.Select>
-
-                </Col>
-
-                {/* PACKING VALUE */}
-
-                <Col xs={6}>
-
-                  <Form.Label>
-                    Packing Value
-                  </Form.Label>
-
-                  <Form.Control
-                    type="number"
-
-                    step="0.01"
-
-                    value={
-                      form.charges
-                        .packingValue
-                    }
-
-                    onChange={(
-                      event
-                    ) =>
-                      setForm({
-                        ...form,
-
-                        charges: {
-                          ...form.charges,
-
-                          packingValue:
-                            event
-                              .target
-                              .value
-                        }
-                      })
-                    }
-                  />
-
-                </Col>
-
-                {/* FREIGHT MODE */}
-
-                <Col xs={6}>
-
-                  <Form.Label>
-                    Freight Mode
-                  </Form.Label>
-
-                  <Form.Select
-                    value={
-                      form.charges
-                        .freightMode
-                    }
-
-                    onChange={(
-                      event
-                    ) =>
-                      setForm({
-                        ...form,
-
-                        charges: {
-                          ...form.charges,
-
-                          freightMode:
-                            event
-                              .target
-                              .value
-                        }
-                      })
-                    }
-                  >
-                    {CHARGE_MODES.map(
-                      (mode) => (
-                        <option
-                          key={
-                            mode
-                          }
-                        >
-                          {mode}
-                        </option>
-                      )
-                    )}
-                  </Form.Select>
-
-                </Col>
-
-                {/* FREIGHT VALUE */}
-
-                <Col xs={6}>
-
-                  <Form.Label>
-                    Freight Value
-                  </Form.Label>
-
-                  <Form.Control
-                    type="number"
-
-                    step="0.01"
-
-                    value={
-                      form.charges
-                        .freightValue
-                    }
-
-                    onChange={(
-                      event
-                    ) =>
-                      setForm({
-                        ...form,
-
-                        charges: {
-                          ...form.charges,
-
-                          freightValue:
-                            event
-                              .target
-                              .value
-                        }
-                      })
-                    }
-                  />
-
-                </Col>
-
-                {/* ROUNDING */}
 
                 <Col xs={12}>
 
@@ -2910,11 +2871,10 @@ export default function POFormPage() {
 
               </Row>
 
-              {/* TOTAL PREVIEW */}
-
               <div className="totals-box">
 
                 <div>
+
                   <span>
                     Subtotal
                   </span>
@@ -2925,9 +2885,11 @@ export default function POFormPage() {
                       form.currency
                     )}
                   </strong>
+
                 </div>
 
                 <div>
+
                   <span>
                     GST
                   </span>
@@ -2938,32 +2900,22 @@ export default function POFormPage() {
                       form.currency
                     )}
                   </strong>
+
                 </div>
 
                 <div>
+
                   <span>
-                    Packing
+                    Rounding Off
                   </span>
 
                   <strong>
                     {formatMoney(
-                      calc.packing,
+                      calc.rounding,
                       form.currency
                     )}
                   </strong>
-                </div>
 
-                <div>
-                  <span>
-                    Freight
-                  </span>
-
-                  <strong>
-                    {formatMoney(
-                      calc.freight,
-                      form.currency
-                    )}
-                  </strong>
                 </div>
 
                 <div className="grand">
@@ -2984,7 +2936,9 @@ export default function POFormPage() {
               </div>
 
               <div className="small text-secondary mt-3">
-                This is a UI estimate. The Node.js backend is the final authority for calculations and amount-in-words.
+
+                Packing & Forwarding and Freight Charges are maintained directly under Specific PO Terms.
+
               </div>
 
             </Card.Body>
@@ -2995,36 +2949,46 @@ export default function POFormPage() {
 
       </Row>
 
-      {/* ===============================================
+      {/* =================================================
           BOTTOM ACTIONS
-      =============================================== */}
+      ================================================= */}
 
       <div className="d-flex justify-content-end gap-2 pb-4">
 
         <Button
           type="button"
+
           variant="outline-secondary"
+
           onClick={() =>
-            navigate(-1)
+            navigate(
+              -1
+            )
           }
         >
+
           Cancel
+
         </Button>
 
         <Button
           type="submit"
+
           size="lg"
+
           disabled={
             save.isPending
           }
         >
+
           <i className="bi bi-save me-2" />
 
           {save.isPending
             ? "Saving..."
             : editing
-            ? "Update Draft"
+            ? "Update PO"
             : "Save Draft"}
+
         </Button>
 
       </div>

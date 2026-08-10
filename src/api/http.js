@@ -25,7 +25,10 @@ http.interceptors.response.use(
     if (error?.response?.status === 401) {
       localStorage.removeItem("po_access_token");
       localStorage.removeItem("po_user");
-      window.dispatchEvent(new Event("po-auth-expired"));
+
+      window.dispatchEvent(
+        new Event("po-auth-expired")
+      );
     }
 
     return Promise.reject(error);
