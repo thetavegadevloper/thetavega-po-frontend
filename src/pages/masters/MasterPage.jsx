@@ -1,4 +1,5 @@
 import { useState } from "react";
+
 import {
   useMutation,
   useQuery,
@@ -589,7 +590,7 @@ function Field({
   }
 
   // ===================================================
-  // NORMAL
+  // NORMAL FIELD
   // ===================================================
   return (
     <Form.Control
@@ -756,7 +757,9 @@ function buildVendorFormData(
       field
     ) => {
       const value =
-        data[field];
+        data[
+          field
+        ];
 
       if (
         value !==
@@ -920,7 +923,7 @@ export default function MasterPage({
   //
   // Example:
   //
-  // config.autoCode = {
+  // autoCode: {
   //   enabled: true,
   //   field: "vendorCode"
   // }
@@ -936,7 +939,7 @@ export default function MasterPage({
     );
 
   // ===================================================
-  // AUTO CODE LOADING
+  // AUTO CODE PREVIEW LOADING
   // ===================================================
   const [
     codeLoading,
@@ -946,12 +949,6 @@ export default function MasterPage({
 
   // ===================================================
   // GST / ADDRESS CONFIGURATION
-  //
-  // COMPANY
-  // VENDOR
-  // DELIVERY ADDRESS
-  //
-  // can all use same logic.
   // ===================================================
   const gstConfig =
     config.gstAutoFill ||
@@ -1048,6 +1045,12 @@ export default function MasterPage({
 
   // ===================================================
   // SAVE
+  //
+  // IMPORTANT:
+  //
+  // Actual code allocation happens in backend CREATE.
+  //
+  // Frontend preview is never final authority.
   // ===================================================
   const save =
     useMutation({
@@ -1065,14 +1068,37 @@ export default function MasterPage({
               payload
             ),
 
-      onSuccess: () => {
-        toast.success(
-          `${config.singular} ${
-            editing
-              ? "updated"
-              : "created"
-          }`
-        );
+      onSuccess: (
+        response
+      ) => {
+        const savedData =
+          response?.data ||
+          response;
+
+        const actualCode =
+          hasAutoCode
+            ? getByPath(
+                savedData,
+                autoCodeConfig.field
+              )
+            : "";
+
+        if (
+          actualCode &&
+          !editing
+        ) {
+          toast.success(
+            `${config.singular} created successfully - ${actualCode}`
+          );
+        } else {
+          toast.success(
+            `${config.singular} ${
+              editing
+                ? "updated"
+                : "created"
+            }`
+          );
+        }
 
         setShow(
           false
@@ -1175,23 +1201,30 @@ export default function MasterPage({
   }
 
   // ===================================================
-  // GENERATE NEXT MASTER CODE
+  // LOAD NEXT MASTER CODE - PREVIEW ONLY
   //
-  // Examples:
+  // IMPORTANT:
   //
-  // /vendors
-  // -> master = vendors
-  // -> TT01
+  // THIS DOES NOT INCREMENT SEQUENCE.
   //
-  // /companies
-  // -> master = companies
-  // -> CMP01
+  // Example:
   //
-  // /materials
-  // -> master = materials
-  // -> MAT001
+  // DB value = 10
+  //
+  // Open Vendor
+  // -> preview TT11
+  // -> DB remains 10
+  //
+  // Cancel
+  // -> DB remains 10
+  //
+  // Open again
+  // -> TT11 again
+  //
+  // Actual increment only happens when CREATE API
+  // is called after pressing Save.
   // ===================================================
-  async function loadNextCode() {
+  async function loadNextCodePreview() {
     if (
       !hasAutoCode
     ) {
@@ -1204,11 +1237,13 @@ export default function MasterPage({
 
     try {
       // =================================================
-      // REMOVE LEADING /
+      // GET MASTER KEY FROM ENDPOINT
       //
       // /vendors
-      // becomes
-      // vendors
+      // -> vendors
+      //
+      // /cost-centers
+      // -> cost-centers
       // =================================================
       const master =
         String(
@@ -1221,12 +1256,21 @@ export default function MasterPage({
           )
           .trim();
 
-      if (!master) {
+      if (
+        !master
+      ) {
         throw new Error(
           "Master endpoint is missing"
         );
       }
 
+      // =================================================
+      // PREVIEW API
+      //
+      // Backend getNextCode() now only previews.
+      //
+      // NO MongoDB $inc here.
+      // =================================================
       const response =
         await http.get(
           "/master-code/next",
@@ -1237,21 +1281,21 @@ export default function MasterPage({
           }
         );
 
-      const generatedCode =
+      const previewCode =
         response.data?.data
           ?.code ||
         "";
 
       if (
-        !generatedCode
+        !previewCode
       ) {
         throw new Error(
-          "Code could not be generated"
+          "Code preview could not be generated"
         );
       }
 
       // =================================================
-      // PUT GENERATED CODE INTO CONFIGURED FIELD
+      // SHOW PREVIEW CODE IN FORM
       // =================================================
       setForm(
         (
@@ -1260,23 +1304,23 @@ export default function MasterPage({
           setByPath(
             previous,
             autoCodeConfig.field,
-            generatedCode
+            previewCode
           )
       );
 
-      return generatedCode;
+      return previewCode;
     } catch (
       error
     ) {
       console.error(
-        "[MASTER AUTO CODE]",
+        "[MASTER CODE PREVIEW]",
         error
       );
 
       toast.error(
         getApiError(
           error,
-          "Unable to generate code"
+          "Unable to preview next code"
         )
       );
 
@@ -1290,6 +1334,12 @@ export default function MasterPage({
 
   // ===================================================
   // NEW
+  //
+  // Opening form only previews code.
+  //
+  // NO increment.
+  //
+  // Cancel does nothing to sequence.
   // ===================================================
   async function openNew() {
     setEditing(
@@ -1297,7 +1347,7 @@ export default function MasterPage({
     );
 
     // =================================================
-    // RESET FORM FIRST
+    // RESET FORM
     // =================================================
     setForm(
       structuredClone(
@@ -1313,19 +1363,22 @@ export default function MasterPage({
     );
 
     // =================================================
-    // GENERATE CODE ONLY FOR NEW RECORD
-    //
-    // NEVER GENERATE NEW CODE DURING EDIT.
+    // PREVIEW CODE ONLY
     // =================================================
     if (
       hasAutoCode
     ) {
-      await loadNextCode();
+      await loadNextCodePreview();
     }
   }
 
   // ===================================================
   // EDIT
+  //
+  // Existing saved code remains unchanged.
+  //
+  // No preview.
+  // No increment.
   // ===================================================
   function openEdit(
     row
@@ -1334,9 +1387,6 @@ export default function MasterPage({
       row
     );
 
-    // =================================================
-    // KEEP EXISTING SAVED CODE
-    // =================================================
     setForm(
       structuredClone(
         row
@@ -1367,12 +1417,16 @@ export default function MasterPage({
           "registeredAddress.city"
         );
 
-      if (state) {
+      if (
+        state
+      ) {
         loadCities(
           state
         );
 
-        if (city) {
+        if (
+          city
+        ) {
           loadAreas(
             state,
             city,
@@ -1549,7 +1603,9 @@ export default function MasterPage({
         []
       );
 
-      if (!silent) {
+      if (
+        !silent
+      ) {
         toast.error(
           getApiError(
             error,
@@ -1568,8 +1624,6 @@ export default function MasterPage({
 
   // ===================================================
   // GST LOOKUP
-  //
-  // Works dynamically based on config:
   //
   // Company:
   // gstin -> pan
@@ -1619,7 +1673,9 @@ export default function MasterPage({
       const data =
         response.data?.data;
 
-      if (!data) {
+      if (
+        !data
+      ) {
         return;
       }
 
@@ -1683,7 +1739,7 @@ export default function MasterPage({
           }
 
           // =============================================
-          // TOP LEVEL GST STATE
+          // TOP-LEVEL GST STATE
           // COMPANY
           // =============================================
           if (
@@ -1699,7 +1755,7 @@ export default function MasterPage({
           }
 
           // =============================================
-          // TOP LEVEL GST STATE CODE
+          // TOP-LEVEL GST STATE CODE
           // COMPANY
           // =============================================
           if (
@@ -1754,9 +1810,7 @@ export default function MasterPage({
             );
 
           // =============================================
-          // IF STATE CHANGED
-          //
-          // CLEAR CITY / DISTRICT / PINCODE
+          // CLEAR DEPENDENT VALUES IF STATE CHANGED
           // =============================================
           if (
             stateChanged
@@ -1798,7 +1852,7 @@ export default function MasterPage({
       );
 
       // =================================================
-      // AUTO LOAD CITY DROPDOWN
+      // LOAD CITIES FROM GST STATE
       // =================================================
       if (
         hasAddressAutoFill &&
@@ -1838,11 +1892,6 @@ export default function MasterPage({
 
   // ===================================================
   // STATE CHANGE
-  //
-  // Used by:
-  // Company
-  // Vendor
-  // Delivery Address
   // ===================================================
   async function changeAddressState(
     stateName
@@ -1964,9 +2013,6 @@ export default function MasterPage({
             cityName
           );
 
-        // =============================================
-        // CLEAR AREA DEPENDENT VALUES
-        // =============================================
         next =
           setByPath(
             next,
@@ -2028,7 +2074,9 @@ export default function MasterPage({
         )
       ];
 
-    if (!area) {
+    if (
+      !area
+    ) {
       return;
     }
 
@@ -2118,9 +2166,9 @@ export default function MasterPage({
   //
   // Supports:
   //
-  // Auto Code
+  // Auto Code Preview
   // GST Auto Fill
-  // Address Auto Fill
+  // Smart Address
   // ===================================================
   function renderSmartField(
     field
@@ -2150,13 +2198,14 @@ export default function MasterPage({
     // =================================================
     // AUTO-GENERATED MASTER CODE
     //
-    // READ ONLY
+    // NEW:
+    // Preview only.
     //
-    // New:
-    // Auto generated
+    // SAVE:
+    // Backend allocates actual code.
     //
-    // Edit:
-    // Existing saved code retained
+    // EDIT:
+    // Existing code retained.
     // =================================================
     if (
       hasAutoCode &&
@@ -2177,7 +2226,7 @@ export default function MasterPage({
             }
             placeholder={
               codeLoading
-                ? "Generating..."
+                ? "Loading next code..."
                 : "Auto generated"
             }
           />
@@ -2206,7 +2255,7 @@ export default function MasterPage({
 
                 <i className="bi bi-check-circle me-1" />
 
-                Generated automatically
+                Next code - assigned on Save
 
               </div>
             )}
@@ -2217,17 +2266,6 @@ export default function MasterPage({
 
     // =================================================
     // GST NUMBER
-    //
-    // Supports:
-    //
-    // Company:
-    // gstin
-    //
-    // Vendor:
-    // gstNo
-    //
-    // Delivery:
-    // gstNo
     // =================================================
     if (
       hasGSTAutoFill &&
@@ -2272,9 +2310,6 @@ export default function MasterPage({
                 gstValue
               );
 
-              // =========================================
-              // AUTO LOOKUP ON COMPLETE GST
-              // =========================================
               if (
                 gstValue.length ===
                 15
@@ -2309,17 +2344,6 @@ export default function MasterPage({
 
     // =================================================
     // PAN
-    //
-    // Company:
-    // pan
-    //
-    // Vendor:
-    // panNo
-    //
-    // Delivery:
-    // panNo
-    //
-    // Auto-filled but editable
     // =================================================
     if (
       hasGSTAutoFill &&
@@ -2365,8 +2389,6 @@ export default function MasterPage({
 
     // =================================================
     // TOP LEVEL GST STATE CODE
-    //
-    // COMPANY
     // =================================================
     if (
       hasGSTAutoFill &&
@@ -2391,8 +2413,6 @@ export default function MasterPage({
 
     // =================================================
     // TOP LEVEL GST STATE
-    //
-    // COMPANY
     // =================================================
     if (
       hasGSTAutoFill &&
@@ -2417,8 +2437,6 @@ export default function MasterPage({
 
     // =================================================
     // ADDRESS STATE
-    //
-    // STATE DROPDOWN
     // =================================================
     if (
       hasAddressAutoFill &&
@@ -2494,10 +2512,8 @@ export default function MasterPage({
     // CITY
     //
     // State
-    // ↓
-    // City dropdown
-    // ↓
-    // Area / Post Office dropdown
+    // -> City
+    // -> Area / Post Office
     // =================================================
     if (
       hasAddressAutoFill &&
@@ -2516,9 +2532,6 @@ export default function MasterPage({
 
       return (
         <>
-          {/* =============================================
-              CITY DROPDOWN
-          ============================================= */}
           <div className="position-relative">
 
             <Form.Select
@@ -2603,9 +2616,7 @@ export default function MasterPage({
             <div className="mt-2">
 
               <Form.Label className="small fw-semibold mb-1">
-
                 Area / Post Office
-
               </Form.Label>
 
               <div className="position-relative">
@@ -2627,13 +2638,11 @@ export default function MasterPage({
                 >
 
                   <option value="">
-
                     {areaLoading
                       ? "Loading areas..."
                       : areaOptions.length
                       ? "Select Area / Post Office"
                       : "No Area / Post Office available"}
-
                   </option>
 
                   {areaOptions.map(
@@ -2716,16 +2725,6 @@ export default function MasterPage({
 
     // =================================================
     // PINCODE
-    //
-    // NOT ENTERED MANUALLY
-    //
-    // State
-    // ↓
-    // City
-    // ↓
-    // Area
-    // ↓
-    // Pincode
     // =================================================
     if (
       hasAddressAutoFill &&
@@ -2798,23 +2797,29 @@ export default function MasterPage({
     event.preventDefault();
 
     // =================================================
-    // PREVENT SAVE IF AUTO CODE FAILED
+    // PREVIEW CODE MUST BE AVAILABLE
+    //
+    // IMPORTANT:
+    //
+    // This does NOT mean this is the final code.
+    //
+    // Backend create controller allocates final code.
     // =================================================
     if (
       hasAutoCode &&
       !editing
     ) {
-      const generatedCode =
+      const previewCode =
         getByPath(
           form,
           autoCodeConfig.field
         );
 
       if (
-        !generatedCode
+        !previewCode
       ) {
         toast.error(
-          "Master code is not generated. Please close and open the form again."
+          "Unable to preview master code. Please close and open the form again."
         );
 
         return;
@@ -2824,7 +2829,7 @@ export default function MasterPage({
     // =================================================
     // VENDOR
     //
-    // Existing GridFS / multipart logic remains same.
+    // Existing GridFS multipart logic remains same.
     // =================================================
     if (
       config.endpoint ===
@@ -2851,6 +2856,10 @@ export default function MasterPage({
           vendorData
         );
 
+      // =================================================
+      // ACTUAL VENDOR CODE ALLOCATION HAPPENS
+      // IN BACKEND vendorController.create()
+      // =================================================
       save.mutate(
         formData
       );
@@ -2878,6 +2887,14 @@ export default function MasterPage({
           )
         : payload;
 
+    // =================================================
+    // ACTUAL CODE ALLOCATION HAPPENS IN BACKEND:
+    //
+    // Company -> companyController.create()
+    //
+    // Other generic masters ->
+    // masterControllerFactory.create()
+    // =================================================
     save.mutate(
       payload
     );
@@ -2893,8 +2910,12 @@ export default function MasterPage({
   const pagination =
     query.data
       ?.pagination || {
-      page: 1,
-      pages: 1,
+      page:
+        1,
+
+      pages:
+        1,
+
       total:
         rows.length
     };
@@ -2917,6 +2938,7 @@ export default function MasterPage({
               config.writePermission
             ]}
           >
+
             <Button
               onClick={
                 openNew
@@ -2931,6 +2953,7 @@ export default function MasterPage({
               }
 
             </Button>
+
           </PermissionGate>
         }
       />
@@ -2942,8 +2965,12 @@ export default function MasterPage({
           <Row className="g-2 mb-3">
 
             <Col
-              md={7}
-              lg={5}
+              md={
+                7
+              }
+              lg={
+                5
+              }
             >
 
               <Form.Control
@@ -2971,8 +2998,12 @@ export default function MasterPage({
             </Col>
 
             <Col
-              md={3}
-              lg={2}
+              md={
+                3
+              }
+              lg={
+                2
+              }
             >
 
               <Form.Select
@@ -3220,7 +3251,7 @@ export default function MasterPage({
       </Card>
 
       {/* =================================================
-          MODAL
+          ADD / EDIT MODAL
       ================================================= */}
 
       <Modal
@@ -3408,7 +3439,7 @@ export default function MasterPage({
             >
 
               {codeLoading
-                ? "Generating Code..."
+                ? "Loading Code..."
                 : save.isPending
                 ? "Saving..."
                 : "Save"}
