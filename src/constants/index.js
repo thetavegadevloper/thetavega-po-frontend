@@ -23,11 +23,61 @@ export const PURCHASE_TYPES = ["Domestic", "Import"];
 export const CHARGE_MODES = ["Inclusive", "At Actual", "Percent", "Fixed"];
 
 export const ALL_PERMISSIONS = [
-  "company.read", "company.write", "cost_center.read", "cost_center.write",
-  "project.read", "project.write", "vendor.read", "vendor.write",
-  "material.read", "material.write", "delivery.read", "delivery.write",
-  "term.read", "term.write", "user.read", "user.write", "role.read", "role.write",
-  "po.read", "po.create", "po.update", "po.manual_item", "po.submit",
-  "po.approve", "po.reject", "po.issue", "po.revise", "po.cancel",
-  "po.pdf", "po.attachment", "po.audit", "report.read",
+  // Company
+  "company.read",
+  "company.write",
+
+  // Cost Center
+  "cost_center.read",
+  "cost_center.write",
+
+  // Project
+  "project.read",
+  "project.write",
+
+  // Vendor
+  "vendor.read",
+  "vendor.write",
+
+  // Material
+  "material.read",
+  "material.write",
+
+  // Delivery Address
+  "delivery.read",
+  "delivery.write",
+
+  // Payment Terms
+  "payment.read",
+  "payment.write",
+
+  // PO Terms
+  "term.read",
+  "term.write",
+
+  // Users
+  "user.read",
+  "user.write",
+
+  // Roles
+  "role.read",
+  "role.write",
+
+  // Purchase Order
+  "po.read",
+  "po.create",
+  "po.update",
+  "po.manual_item",
+  "po.submit",
+  "po.approve",
+  "po.reject",
+  "po.issue",
+  "po.revise",
+  "po.cancel",
+  "po.pdf",
+  "po.attachment",
+  "po.audit",
+
+  // Reports
+  "report.read",
 ];

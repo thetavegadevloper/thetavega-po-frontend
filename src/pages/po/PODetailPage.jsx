@@ -1,9 +1,11 @@
 import { useRef, useState } from "react";
+
 import {
   useMutation,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+
 import {
   Alert,
   Button,
@@ -16,17 +18,21 @@ import {
   Tabs,
   Tab,
 } from "react-bootstrap";
+
 import {
   Link,
   useNavigate,
   useParams,
 } from "react-router-dom";
+
 import toast from "react-hot-toast";
 
 import PageHeader from "../../components/common/PageHeader";
 import LoadingBlock from "../../components/common/LoadingBlock";
 import StatusBadge from "../../components/common/StatusBadge";
 import PermissionGate from "../../components/auth/PermissionGate";
+
+import { useAuth } from "../../context/AuthContext";
 
 import { poApi } from "../../api/poApi";
 
@@ -46,6 +52,37 @@ export default function PODetailPage() {
   const qc = useQueryClient();
   const fileRef = useRef();
 
+  // =====================================================
+  // CURRENT LOGGED-IN USER
+  // =====================================================
+  const { user } = useAuth();
+
+  // =====================================================
+  // CURRENT USER APPROVAL LEVEL
+  //
+  // L3 = Supervisor / Initiator
+  // L2 = Manager / Final Authority
+  // L1 = Director / Final Authority
+  //
+  // IMPORTANT:
+  // Role permissions are NOT used for final approval.
+  // =====================================================
+  const approvalLevel = String(
+    user?.approvalLevel || "L3"
+  )
+    .trim()
+    .toUpperCase();
+
+  const isL3 =
+    approvalLevel === "L3";
+
+  const isFinalApprover =
+    approvalLevel === "L2" ||
+    approvalLevel === "L1";
+
+  // =====================================================
+  // STATE
+  // =====================================================
   const [dialog, setDialog] = useState(null);
   const [text, setText] = useState("");
 
@@ -58,6 +95,9 @@ export default function PODetailPage() {
   // =====================================================
   const [pdfLoading, setPdfLoading] = useState(null);
 
+  // =====================================================
+  // EMAIL
+  // =====================================================
   const [email, setEmail] = useState({
     to: "",
     cc: "",
@@ -132,7 +172,10 @@ export default function PODetailPage() {
     },
 
     onSuccess: (r, v) => {
-      toast.success("Action completed");
+      toast.success(
+        r?.message ||
+        "Action completed"
+      );
 
       setDialog(null);
       setText("");
@@ -143,6 +186,10 @@ export default function PODetailPage() {
 
       qc.invalidateQueries({
         queryKey: ["po-audit", id],
+      });
+
+      qc.invalidateQueries({
+        queryKey: ["purchase-orders"],
       });
 
       if (
@@ -156,7 +203,9 @@ export default function PODetailPage() {
     },
 
     onError: (e) =>
-      toast.error(getApiError(e)),
+      toast.error(
+        getApiError(e)
+      ),
   });
 
   // =====================================================
@@ -164,18 +213,28 @@ export default function PODetailPage() {
   // =====================================================
   const upload = useMutation({
     mutationFn: (file) =>
-      poApi.uploadAttachment(id, file),
+      poApi.uploadAttachment(
+        id,
+        file
+      ),
 
     onSuccess: () => {
-      toast.success("Attachment uploaded");
+      toast.success(
+        "Attachment uploaded"
+      );
 
       qc.invalidateQueries({
-        queryKey: ["po-attachments", id],
+        queryKey: [
+          "po-attachments",
+          id,
+        ],
       });
     },
 
     onError: (e) =>
-      toast.error(getApiError(e)),
+      toast.error(
+        getApiError(e)
+      ),
   });
 
   // =====================================================
@@ -183,15 +242,23 @@ export default function PODetailPage() {
   // =====================================================
   const sendEmail = useMutation({
     mutationFn: () =>
-      poApi.email(id, email),
+      poApi.email(
+        id,
+        email
+      ),
 
     onSuccess: () => {
-      toast.success("PO email sent");
+      toast.success(
+        "PO email sent"
+      );
+
       setDialog(null);
     },
 
     onError: (e) =>
-      toast.error(getApiError(e)),
+      toast.error(
+        getApiError(e)
+      ),
   });
 
   // =====================================================
@@ -216,23 +283,28 @@ export default function PODetailPage() {
     );
 
     try {
-      const blob = await poApi.pdfBlob(
-        id,
-        {
-          preview,
-          download,
-        }
-      );
+      const blob =
+        await poApi.pdfBlob(
+          id,
+          {
+            preview,
+            download,
+          }
+        );
 
       const url =
-        URL.createObjectURL(blob);
+        URL.createObjectURL(
+          blob
+        );
 
       // =================================================
       // DOWNLOAD OFFICIAL PDF
       // =================================================
       if (download) {
         const a =
-          document.createElement("a");
+          document.createElement(
+            "a"
+          );
 
         a.href = url;
 
@@ -242,7 +314,9 @@ export default function PODetailPage() {
             "purchase-order"
           }.pdf`;
 
-        document.body.appendChild(a);
+        document.body.appendChild(
+          a
+        );
 
         a.click();
 
@@ -250,7 +324,9 @@ export default function PODetailPage() {
 
         setTimeout(
           () =>
-            URL.revokeObjectURL(url),
+            URL.revokeObjectURL(
+              url
+            ),
           1000
         );
       }
@@ -267,7 +343,9 @@ export default function PODetailPage() {
 
         setTimeout(
           () =>
-            URL.revokeObjectURL(url),
+            URL.revokeObjectURL(
+              url
+            ),
           60000
         );
       }
@@ -281,9 +359,6 @@ export default function PODetailPage() {
         )
       );
     } finally {
-      // =================================================
-      // STOP LOADER
-      // =================================================
       setPdfLoading(null);
     }
   }
@@ -302,10 +377,14 @@ export default function PODetailPage() {
         );
 
       const url =
-        URL.createObjectURL(blob);
+        URL.createObjectURL(
+          blob
+        );
 
       const link =
-        document.createElement("a");
+        document.createElement(
+          "a"
+        );
 
       link.href = url;
 
@@ -313,7 +392,9 @@ export default function PODetailPage() {
         attachment.originalName ||
         "attachment";
 
-      document.body.appendChild(link);
+      document.body.appendChild(
+        link
+      );
 
       link.click();
 
@@ -321,7 +402,9 @@ export default function PODetailPage() {
 
       setTimeout(
         () =>
-          URL.revokeObjectURL(url),
+          URL.revokeObjectURL(
+            url
+          ),
         1000
       );
     } catch (e) {
@@ -343,42 +426,54 @@ export default function PODetailPage() {
         action: "submit",
         payload: text,
       });
-    } else if (
+    }
+
+    else if (
       dialog === "approve"
     ) {
       mutate.mutate({
         action: "approve",
         payload: text,
       });
-    } else if (
+    }
+
+    else if (
       dialog === "reject"
     ) {
       mutate.mutate({
         action: "reject",
         payload: text,
       });
-    } else if (
+    }
+
+    else if (
       dialog === "cancel"
     ) {
       mutate.mutate({
         action: "cancel",
         payload: text,
       });
-    } else if (
+    }
+
+    else if (
       dialog === "close"
     ) {
       mutate.mutate({
         action: "close",
         payload: text,
       });
-    } else if (
+    }
+
+    else if (
       dialog === "revise"
     ) {
       mutate.mutate({
         action: "revise",
         payload: text,
       });
-    } else if (
+    }
+
+    else if (
       dialog === "regenerate"
     ) {
       mutate.mutate({
@@ -386,6 +481,45 @@ export default function PODetailPage() {
         payload: text,
       });
     }
+  }
+
+  // =====================================================
+  // WORKFLOW DIALOG TITLE
+  // =====================================================
+  function getWorkflowDialogTitle() {
+    if (dialog === "submit") {
+      if (isFinalApprover) {
+        return "Finalize Purchase Order";
+      }
+
+      return "Submit PO for Approval";
+    }
+
+    if (dialog === "approve") {
+      return "Approve Purchase Order";
+    }
+
+    if (dialog === "reject") {
+      return "Reject Purchase Order";
+    }
+
+    if (dialog === "cancel") {
+      return "Cancel Purchase Order";
+    }
+
+    if (dialog === "close") {
+      return "Close Purchase Order";
+    }
+
+    if (dialog === "revise") {
+      return "Create PO Revision";
+    }
+
+    if (dialog === "regenerate") {
+      return "Regenerate PDF";
+    }
+
+    return "Purchase Order";
   }
 
   // =====================================================
@@ -405,7 +539,8 @@ export default function PODetailPage() {
     );
   }
 
-  const po = q.data?.data;
+  const po =
+    q.data?.data;
 
   // =====================================================
   // STATUS RULES
@@ -414,14 +549,36 @@ export default function PODetailPage() {
   const isDraft = [
     "Draft",
     "Rejected",
-  ].includes(po.status);
+  ].includes(
+    po.status
+  );
 
+  // =====================================================
+  // EDIT RULE
+  //
+  // Anyone can edit.
+  //
+  // Existing behavior is preserved:
+  //
+  // Draft             -> Edit
+  // Rejected          -> Edit
+  // Pending Approval  -> Edit
+  // Approved          -> Edit
+  // Issued            -> Edit
+  //
+  // Cancelled / Closed -> Locked
+  // =====================================================
   const canEdit =
     ![
       "Cancelled",
       "Closed",
-    ].includes(po.status);
+    ].includes(
+      po.status
+    );
 
+  // =====================================================
+  // TITLE
+  // =====================================================
   const title =
     `PO ${po.poNumber}${
       po.revisionNo
@@ -434,6 +591,7 @@ export default function PODetailPage() {
       {/* =====================================================
           PAGE HEADER
       ===================================================== */}
+
       <PageHeader
         title={title}
         subtitle={`${po.documentHeading} • ${formatDate(
@@ -441,6 +599,8 @@ export default function PODetailPage() {
         )}`}
         actions={
           <>
+            {/* BACK */}
+
             <Button
               variant="outline-secondary"
               onClick={() =>
@@ -450,12 +610,17 @@ export default function PODetailPage() {
               }
             >
               <i className="bi bi-arrow-left me-1" />
+
               Back
             </Button>
 
             {/* ===============================================
                 EDIT BUTTON
+
+                ANY USER CAN EDIT.
+                NO CREATOR RESTRICTION.
             =============================================== */}
+
             {canEdit && (
               <PermissionGate
                 any={[
@@ -469,14 +634,16 @@ export default function PODetailPage() {
                   to={`/purchase-orders/${id}/edit`}
                 >
                   <i className="bi bi-pencil me-1" />
+
                   Edit
                 </Button>
               </PermissionGate>
             )}
 
             {/* ===============================================
-                PREVIEW PDF WITH LOADER
+                PREVIEW PDF
             =============================================== */}
+
             <PermissionGate
               any={[
                 "po.pdf",
@@ -509,6 +676,7 @@ export default function PODetailPage() {
                 ) : (
                   <>
                     <i className="bi bi-file-pdf me-1" />
+
                     Preview PDF
                   </>
                 )}
@@ -521,61 +689,87 @@ export default function PODetailPage() {
       {/* =====================================================
           PO SUMMARY
       ===================================================== */}
+
       <Row className="g-3 mb-3">
+
         <Col lg={8}>
+
           <Card className="border-0 shadow-sm h-100">
+
             <Card.Body className="p-4">
+
               <div className="d-flex justify-content-between align-items-start mb-4">
+
                 <div>
+
                   <div className="small text-secondary">
                     Current Status
                   </div>
 
                   <div className="mt-1">
+
                     <StatusBadge
                       status={
                         po.status
                       }
                     />
+
                   </div>
+
                 </div>
 
                 <div className="text-end">
+
                   <div className="small text-secondary">
                     Grand Total
                   </div>
 
                   <div className="h3 fw-bold mb-0">
+
                     {formatMoney(
                       po.totals
                         ?.grandTotal,
                       po.currency
                     )}
+
                   </div>
 
                   <div className="small text-secondary">
+
                     {
                       po.totals
                         ?.amountInWords
                     }
+
                   </div>
+
                 </div>
+
               </div>
 
               <Row className="g-3">
+
+                {/* ===========================================
+                    VENDOR
+                =========================================== */}
+
                 <Col md={6}>
+
                   <div className="detail-label">
                     Vendor
                   </div>
 
                   <div className="fw-semibold">
+
                     {
                       po.vendor
                         ?.vendorName
                     }
+
                   </div>
 
                   <div className="small text-secondary">
+
                     {
                       po.vendor
                         ?.vendorCode
@@ -584,53 +778,76 @@ export default function PODetailPage() {
                     {po.vendor
                       ?.gstNo ||
                       "-"}
+
                   </div>
 
                   <div className="small">
+
                     {addressText(
                       po.vendor
                         ?.registeredAddress
                     )}
+
                   </div>
+
                 </Col>
 
+                {/* ===========================================
+                    DELIVERY
+                =========================================== */}
+
                 <Col md={6}>
+
                   <div className="detail-label">
                     Delivery Address
                   </div>
 
                   <div className="fw-semibold">
+
                     {
                       po.delivery
                         ?.name
                     }
+
                   </div>
 
                   <div className="small">
+
                     {addressText(
                       po.delivery
                         ?.registeredAddress
                     )}
+
                   </div>
 
                   <div className="small text-secondary">
+
                     {
                       po.delivery
                         ?.storePersonName
                     }{" "}
+
                     {
                       po.delivery
                         ?.storeContactNo
                     }
+
                   </div>
+
                 </Col>
 
+                {/* ===========================================
+                    COST CENTER
+                =========================================== */}
+
                 <Col md={4}>
+
                   <div className="detail-label">
                     Cost Center
                   </div>
 
                   <div>
+
                     {
                       po.costCenter
                         ?.costCenterCode
@@ -640,65 +857,124 @@ export default function PODetailPage() {
                       po.costCenter
                         ?.costCenterName
                     }
+
                   </div>
+
                 </Col>
 
+                {/* ===========================================
+                    PROJECT
+                =========================================== */}
+
                 <Col md={4}>
+
                   <div className="detail-label">
                     Project
                   </div>
 
                   <div>
+
                     {po.project
                       ?.projectCode ||
                       "Not applicable"}
+
                   </div>
 
                   <div className="small text-secondary">
+
                     {
                       po.project
                         ?.projectName
                     }
+
                   </div>
+
                 </Col>
 
+                {/* ===========================================
+                    PAYMENT
+                =========================================== */}
+
                 <Col md={4}>
+
                   <div className="detail-label">
                     Payment
                   </div>
 
                   <div>
+
                     {
                       po.header
                         ?.paymentSummary
                     }
+
                   </div>
+
                 </Col>
+
               </Row>
+
             </Card.Body>
+
           </Card>
+
         </Col>
 
         {/* =====================================================
             WORKFLOW ACTIONS
         ===================================================== */}
+
         <Col lg={4}>
+
           <Card className="border-0 shadow-sm h-100">
+
             <Card.Header className="bg-white fw-bold py-3">
+
               Workflow Actions
+
             </Card.Header>
 
             <Card.Body className="d-grid gap-2">
+
+              {/* =================================================
+                  DRAFT / REJECTED
+
+                  L3
+                  -> Submit for Approval
+                  -> Pending Approval
+
+                  L2 / L1
+                  -> Finalize PO
+                  -> Approved
+
+                  IMPORTANT:
+                  Do NOT use po.approval.required for deciding
+                  which button should be shown.
+
+                  Current logged-in user's level decides.
+              ================================================= */}
+
               {isDraft && (
-                <PermissionGate
-                  any={[
-                    "po.submit",
-                    "po.create",
-                  ]}
-                >
-                  {po.approval
-                    ?.required ? (
+                <>
+                  {isFinalApprover ? (
+
                     <Button
+                      variant="success"
+                      onClick={() =>
+                        setDialog(
+                          "submit"
+                        )
+                      }
+                    >
+                      <i className="bi bi-check2-circle me-2" />
+
+                      Finalize PO
+                    </Button>
+
+                  ) : (
+
+                    <Button
+                      variant="primary"
                       onClick={() =>
                         setDialog(
                           "submit"
@@ -706,74 +982,110 @@ export default function PODetailPage() {
                       }
                     >
                       <i className="bi bi-send me-2" />
-                      Submit for
-                      Approval
+
+                      Submit for Approval
                     </Button>
-                  ) : (
-                    <PermissionGate
-                      any={[
-                        "po.issue",
-                      ]}
-                    >
-                      <Button
-                        variant="success"
-                        onClick={() =>
-                          mutate.mutate(
-                            {
-                              action:
-                                "issue",
-                            }
-                          )
-                        }
-                      >
-                        Issue PO
-                      </Button>
-                    </PermissionGate>
+
                   )}
-                </PermissionGate>
+                </>
               )}
+
+              {/* =================================================
+                  PENDING APPROVAL
+
+                  ONLY L2 / L1 CAN SEE APPROVE / REJECT
+
+                  L3 MUST NOT SEE APPROVE / REJECT
+              ================================================= */}
 
               {po.status ===
                 "Pending Approval" && (
                 <>
-                  <PermissionGate
-                    any={[
-                      "po.approve",
-                    ]}
-                  >
-                    <Button
-                      variant="success"
-                      onClick={() =>
-                        setDialog(
-                          "approve"
-                        )
-                      }
-                    >
-                      <i className="bi bi-check2-circle me-2" />
-                      Approve
-                    </Button>
-                  </PermissionGate>
+                  {isFinalApprover ? (
 
-                  <PermissionGate
-                    any={[
-                      "po.reject",
-                      "po.approve",
-                    ]}
-                  >
-                    <Button
-                      variant="outline-danger"
-                      onClick={() =>
-                        setDialog(
-                          "reject"
-                        )
-                      }
+                    <>
+                      {/* =========================================
+                          APPROVE
+                      ========================================= */}
+
+                      <Button
+                        variant="success"
+                        onClick={() =>
+                          setDialog(
+                            "approve"
+                          )
+                        }
+                      >
+                        <i className="bi bi-check2-circle me-2" />
+
+                        Approve PO
+                      </Button>
+
+                      {/* =========================================
+                          REJECT
+                      ========================================= */}
+
+                      <Button
+                        variant="outline-danger"
+                        onClick={() =>
+                          setDialog(
+                            "reject"
+                          )
+                        }
+                      >
+                        <i className="bi bi-x-circle me-2" />
+
+                        Reject PO
+                      </Button>
+                    </>
+
+                  ) : (
+
+                    /* ===========================================
+                       L3 / NON-FINAL AUTHORITY
+                    =========================================== */
+
+                    <Alert
+                      variant="warning"
+                      className="mb-0"
                     >
-                      <i className="bi bi-x-circle me-2" />
-                      Reject
-                    </Button>
-                  </PermissionGate>
+                      <div className="d-flex align-items-start gap-2">
+
+                        <i className="bi bi-hourglass-split mt-1" />
+
+                        <div>
+
+                          <div className="fw-semibold">
+                            Pending Final Approval
+                          </div>
+
+                          <div className="small mt-1">
+
+                            This Purchase Order has been submitted
+                            for item price and commercial
+                            verification.
+
+                          </div>
+
+                          <div className="small mt-1">
+
+                            Waiting for final approval from
+                            L2 Manager or L1 Director.
+
+                          </div>
+
+                        </div>
+
+                      </div>
+                    </Alert>
+
+                  )}
                 </>
               )}
+
+              {/* =================================================
+                  APPROVED
+              ================================================= */}
 
               {po.status ===
                 "Approved" && (
@@ -785,26 +1097,30 @@ export default function PODetailPage() {
                   <Button
                     variant="success"
                     onClick={() =>
-                      mutate.mutate(
-                        {
-                          action:
-                            "issue",
-                        }
-                      )
+                      mutate.mutate({
+                        action:
+                          "issue",
+                      })
                     }
                   >
                     <i className="bi bi-send-check me-2" />
+
                     Issue PO
                   </Button>
                 </PermissionGate>
               )}
 
+              {/* =================================================
+                  ISSUED
+              ================================================= */}
+
               {po.status ===
                 "Issued" && (
                 <>
                   {/* =========================================
-                      DOWNLOAD OFFICIAL PDF WITH LOADER
+                      DOWNLOAD OFFICIAL PDF
                   ========================================= */}
+
                   <PermissionGate
                     any={[
                       "po.pdf",
@@ -837,12 +1153,16 @@ export default function PODetailPage() {
                       ) : (
                         <>
                           <i className="bi bi-download me-2" />
-                          Download Official
-                          PDF
+
+                          Download Official PDF
                         </>
                       )}
                     </Button>
                   </PermissionGate>
+
+                  {/* =========================================
+                      EMAIL
+                  ========================================= */}
 
                   <PermissionGate
                     any={[
@@ -858,9 +1178,14 @@ export default function PODetailPage() {
                       }
                     >
                       <i className="bi bi-envelope me-2" />
+
                       Email PO
                     </Button>
                   </PermissionGate>
+
+                  {/* =========================================
+                      REVISION
+                  ========================================= */}
 
                   <PermissionGate
                     any={[
@@ -876,9 +1201,14 @@ export default function PODetailPage() {
                       }
                     >
                       <i className="bi bi-files me-2" />
+
                       Create Revision
                     </Button>
                   </PermissionGate>
+
+                  {/* =========================================
+                      CLOSE
+                  ========================================= */}
 
                   <PermissionGate
                     any={[
@@ -896,6 +1226,10 @@ export default function PODetailPage() {
                       Close PO
                     </Button>
                   </PermissionGate>
+
+                  {/* =========================================
+                      REGENERATE PDF
+                  ========================================= */}
 
                   <PermissionGate
                     any={[
@@ -917,6 +1251,10 @@ export default function PODetailPage() {
                 </>
               )}
 
+              {/* =================================================
+                  CANCEL
+              ================================================= */}
+
               {![
                 "Cancelled",
                 "Closed",
@@ -937,60 +1275,91 @@ export default function PODetailPage() {
                     }
                   >
                     <i className="bi bi-ban me-2" />
+
                     Cancel PO
                   </Button>
                 </PermissionGate>
               )}
+
             </Card.Body>
+
           </Card>
+
         </Col>
+
       </Row>
 
       {/* =====================================================
           DETAILS TABS
       ===================================================== */}
+
       <Card className="border-0 shadow-sm">
+
         <Card.Body className="p-0">
+
           <Tabs
             defaultActiveKey="items"
             className="px-3 pt-3"
           >
-            {/* ITEMS */}
+
+            {/* =================================================
+                ITEMS
+            ================================================= */}
+
             <Tab
               eventKey="items"
               title="Items"
             >
               <div className="table-responsive">
+
                 <Table className="align-middle mb-0">
+
                   <thead className="table-light">
+
                     <tr>
-                      <th>Sr.</th>
+
+                      <th>
+                        Sr.
+                      </th>
+
                       <th>
                         Material
                       </th>
+
                       <th>
                         Description
                       </th>
+
                       <th>
                         HSN/SAC
                       </th>
-                      <th>UOM</th>
+
+                      <th>
+                        UOM
+                      </th>
+
                       <th className="text-end">
                         Qty
                       </th>
+
                       <th className="text-end">
                         Rate
                       </th>
+
                       <th className="text-end">
                         GST
                       </th>
+
                       <th className="text-end">
                         Basic
                       </th>
+
                     </tr>
+
                   </thead>
 
                   <tbody>
+
                     {po.items.map(
                       (i) => (
                         <tr
@@ -998,6 +1367,7 @@ export default function PODetailPage() {
                             i._id
                           }
                         >
+
                           <td>
                             {
                               i.srNo
@@ -1034,32 +1404,42 @@ export default function PODetailPage() {
                           </td>
 
                           <td className="text-end">
+
                             {formatMoney(
                               i.rate,
                               po.currency
                             )}
+
                           </td>
 
                           <td className="text-end">
+
                             {
                               i.gstPercent
                             }
                             %
+
                           </td>
 
                           <td className="text-end fw-semibold">
+
                             {formatMoney(
                               i.basicAmount,
                               po.currency
                             )}
+
                           </td>
+
                         </tr>
                       )
                     )}
+
                   </tbody>
 
                   <tfoot>
+
                     <tr>
+
                       <td
                         colSpan="8"
                         className="text-end fw-semibold"
@@ -1068,15 +1448,19 @@ export default function PODetailPage() {
                       </td>
 
                       <td className="text-end fw-bold">
+
                         {formatMoney(
                           po.totals
                             .subTotal,
                           po.currency
                         )}
+
                       </td>
+
                     </tr>
 
                     <tr>
+
                       <td
                         colSpan="8"
                         className="text-end fw-semibold"
@@ -1085,15 +1469,19 @@ export default function PODetailPage() {
                       </td>
 
                       <td className="text-end fw-bold">
+
                         {formatMoney(
                           po.totals
                             .taxTotal,
                           po.currency
                         )}
+
                       </td>
+
                     </tr>
 
                     <tr>
+
                       <td
                         colSpan="8"
                         className="text-end fw-semibold"
@@ -1102,24 +1490,34 @@ export default function PODetailPage() {
                       </td>
 
                       <td className="text-end fw-bold fs-5">
+
                         {formatMoney(
                           po.totals
                             .grandTotal,
                           po.currency
                         )}
+
                       </td>
+
                     </tr>
+
                   </tfoot>
+
                 </Table>
+
               </div>
             </Tab>
 
-            {/* TERMS */}
+            {/* =================================================
+                TERMS
+            ================================================= */}
+
             <Tab
               eventKey="terms"
               title="Terms & Conditions"
             >
               <div className="p-4">
+
                 <h6>
                   Specific Terms
                 </h6>
@@ -1131,16 +1529,19 @@ export default function PODetailPage() {
                       className="mb-3"
                     >
                       <div className="fw-semibold">
+
                         {
                           t.displayOrder
                         }
                         .{" "}
                         {t.title}
+
                       </div>
 
                       <div>
                         {t.text}
                       </div>
+
                     </div>
                   )
                 )}
@@ -1158,182 +1559,317 @@ export default function PODetailPage() {
                       className="mb-3"
                     >
                       <div className="fw-semibold">
+
                         {
                           t.displayOrder
                         }
                         .{" "}
                         {t.title}
+
                       </div>
 
                       <div>
                         {t.text}
                       </div>
+
                     </div>
                   )
                 )}
+
               </div>
             </Tab>
 
-            {/* APPROVAL */}
+            {/* =================================================
+                APPROVAL
+            ================================================= */}
+
             <Tab
               eventKey="approval"
               title="Approval"
             >
               <div className="p-4">
+
                 <Row className="g-3">
+
+                  {/* =========================================
+                      SUBMITTED
+                  ========================================= */}
+
                   <Col md={4}>
+
                     <div className="detail-label">
                       Submitted
                     </div>
 
-                    <div>
+                    <div className="fw-semibold">
+
                       {po.approval
                         ?.submittedBy
                         ?.name ||
                         "-"}
+
                     </div>
 
-                    <small>
+                    {po.approval
+                      ?.submittedLevel && (
+                      <div className="mt-1 mb-1">
+
+                        <span className="badge text-bg-secondary">
+
+                          {
+                            po.approval
+                              .submittedLevel
+                          }
+
+                        </span>
+
+                      </div>
+                    )}
+
+                    <small className="text-secondary">
+
                       {formatDateTime(
                         po.approval
                           ?.submittedAt
                       )}
+
                     </small>
 
-                    <div>
-                      {
-                        po.approval
-                          ?.submitComment
-                      }
-                    </div>
+                    {po.approval
+                      ?.submitComment && (
+                      <div className="mt-2">
+
+                        {
+                          po.approval
+                            .submitComment
+                        }
+
+                      </div>
+                    )}
+
                   </Col>
 
+                  {/* =========================================
+                      APPROVED
+                  ========================================= */}
+
                   <Col md={4}>
+
                     <div className="detail-label">
                       Approved
                     </div>
 
-                    <div>
+                    <div className="fw-semibold">
+
                       {po.approval
                         ?.approvedBy
                         ?.name ||
                         "-"}
+
                     </div>
 
-                    <small>
+                    {po.approval
+                      ?.approvedLevel && (
+                      <div className="mt-1 mb-1">
+
+                        <span className="badge text-bg-success">
+
+                          {
+                            po.approval
+                              .approvedLevel
+                          }
+
+                        </span>
+
+                      </div>
+                    )}
+
+                    <small className="text-secondary">
+
                       {formatDateTime(
                         po.approval
                           ?.approvedAt
                       )}
+
                     </small>
 
-                    <div>
-                      {
-                        po.approval
-                          ?.approvalComment
-                      }
-                    </div>
+                    {po.approval
+                      ?.approvalComment && (
+                      <div className="mt-2">
+
+                        {
+                          po.approval
+                            .approvalComment
+                        }
+
+                      </div>
+                    )}
+
                   </Col>
 
+                  {/* =========================================
+                      REJECTED
+                  ========================================= */}
+
                   <Col md={4}>
+
                     <div className="detail-label">
                       Rejected
                     </div>
 
-                    <div>
+                    <div className="fw-semibold">
+
                       {po.approval
                         ?.rejectedBy
                         ?.name ||
                         "-"}
+
                     </div>
 
-                    <small>
+                    {po.approval
+                      ?.rejectedLevel && (
+                      <div className="mt-1 mb-1">
+
+                        <span className="badge text-bg-danger">
+
+                          {
+                            po.approval
+                              .rejectedLevel
+                          }
+
+                        </span>
+
+                      </div>
+                    )}
+
+                    <small className="text-secondary">
+
                       {formatDateTime(
                         po.approval
                           ?.rejectedAt
                       )}
+
                     </small>
 
-                    <div className="text-danger">
-                      {
-                        po.approval
-                          ?.rejectionReason
-                      }
-                    </div>
+                    {po.approval
+                      ?.rejectionReason && (
+                      <div className="text-danger mt-2">
+
+                        {
+                          po.approval
+                            .rejectionReason
+                        }
+
+                      </div>
+                    )}
+
                   </Col>
+
                 </Row>
+
               </div>
             </Tab>
 
-            {/* AUDIT */}
+            {/* =================================================
+                AUDIT
+            ================================================= */}
+
             <Tab
               eventKey="audit"
               title="Audit"
             >
               <div className="table-responsive">
+
                 <Table className="mb-0">
+
                   <thead className="table-light">
+
                     <tr>
+
                       <th>
                         Time
                       </th>
+
                       <th>
                         Action
                       </th>
+
                       <th>
                         User
                       </th>
+
                       <th>
                         Remarks
                       </th>
+
                     </tr>
+
                   </thead>
 
                   <tbody>
+
                     {(
                       audit.data
-                        ?.data || []
-                    ).map((a) => (
-                      <tr
-                        key={
-                          a._id
-                        }
-                      >
-                        <td>
-                          {formatDateTime(
-                            a.changedAt
-                          )}
-                        </td>
-
-                        <td>
-                          {
-                            a.action
+                        ?.data ||
+                      []
+                    ).map(
+                      (a) => (
+                        <tr
+                          key={
+                            a._id
                           }
-                        </td>
+                        >
 
-                        <td>
-                          {a.changedBy
-                            ?.name ||
-                            "-"}
-                        </td>
+                          <td>
 
-                        <td>
-                          {a.remarks ||
-                            "-"}
-                        </td>
-                      </tr>
-                    ))}
+                            {formatDateTime(
+                              a.changedAt
+                            )}
+
+                          </td>
+
+                          <td>
+                            {
+                              a.action
+                            }
+                          </td>
+
+                          <td>
+
+                            {a.changedBy
+                              ?.name ||
+                              "-"}
+
+                          </td>
+
+                          <td>
+
+                            {a.remarks ||
+                              "-"}
+
+                          </td>
+
+                        </tr>
+                      )
+                    )}
+
                   </tbody>
+
                 </Table>
+
               </div>
             </Tab>
 
-            {/* ATTACHMENTS */}
+            {/* =================================================
+                ATTACHMENTS
+            ================================================= */}
+
             <Tab
               eventKey="attachments"
               title="Attachments"
             >
               <div className="p-4">
+
                 <PermissionGate
                   any={[
                     "po.attachment",
@@ -1341,6 +1877,7 @@ export default function PODetailPage() {
                   ]}
                 >
                   <div className="d-flex gap-2 mb-3">
+
                     <Form.Control
                       type="file"
                       ref={
@@ -1367,107 +1904,227 @@ export default function PODetailPage() {
                     >
                       Upload
                     </Button>
+
                   </div>
                 </PermissionGate>
 
                 <div className="list-group">
+
                   {(
                     attachments
                       .data?.data ||
                     []
-                  ).map((a) => (
-                    <button
-                      type="button"
-                      className="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
-                      key={
-                        a._id
-                      }
-                      onClick={() =>
-                        downloadAttachment(
-                          a
-                        )
-                      }
-                    >
-                      <span>
-                        <i className="bi bi-paperclip me-2" />
+                  ).map(
+                    (a) => (
+                      <button
+                        type="button"
+                        className="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                        key={
+                          a._id
+                        }
+                        onClick={() =>
+                          downloadAttachment(
+                            a
+                          )
+                        }
+                      >
 
-                        {a.originalName ||
-                          "Attachment"}
+                        <span>
 
-                        <small className="text-secondary ms-2">
-                          {
-                            a.fileType
-                          }
+                          <i className="bi bi-paperclip me-2" />
+
+                          {a.originalName ||
+                            "Attachment"}
+
+                          <small className="text-secondary ms-2">
+
+                            {
+                              a.fileType
+                            }
+
+                          </small>
+
+                        </span>
+
+                        <small>
+
+                          {formatDateTime(
+                            a.uploadedAt
+                          )}
+
                         </small>
-                      </span>
 
-                      <small>
-                        {formatDateTime(
-                          a.uploadedAt
-                        )}
-                      </small>
-                    </button>
-                  ))}
+                      </button>
+                    )
+                  )}
+
                 </div>
+
               </div>
             </Tab>
+
           </Tabs>
+
         </Card.Body>
+
       </Card>
 
       {/* =====================================================
           WORKFLOW MODAL
       ===================================================== */}
+
       <Modal
         show={Boolean(
           dialog &&
-            dialog !== "email"
+          dialog !== "email"
         )}
-        onHide={() =>
-          setDialog(null)
-        }
+        onHide={() => {
+          setDialog(null);
+          setText("");
+        }}
         centered
       >
+
         <Modal.Header closeButton>
+
           <Modal.Title>
-            {dialog
-              ?.charAt(0)
-              .toUpperCase() +
-              dialog?.slice(1)}{" "}
-            PO
+
+            {getWorkflowDialogTitle()}
+
           </Modal.Title>
+
         </Modal.Header>
 
         <Modal.Body>
+
+          {/* =================================================
+              FINALIZE INFORMATION
+          ================================================= */}
+
+          {dialog === "submit" &&
+            isFinalApprover && (
+              <Alert variant="success">
+
+                <div className="fw-semibold mb-1">
+
+                  Final Approval Authority — {approvalLevel}
+
+                </div>
+
+                <div className="small">
+
+                  Confirming this action will directly finalize
+                  this Purchase Order and mark it as Approved.
+
+                </div>
+
+              </Alert>
+            )}
+
+          {/* =================================================
+              L3 SUBMISSION INFORMATION
+          ================================================= */}
+
+          {dialog === "submit" &&
+            isL3 && (
+              <Alert variant="info">
+
+                <div className="fw-semibold mb-1">
+
+                  Submit for Verification
+
+                </div>
+
+                <div className="small">
+
+                  This Purchase Order will move to Pending
+                  Approval for L2 / L1 item price and
+                  commercial verification.
+
+                </div>
+
+              </Alert>
+            )}
+
+          {/* =================================================
+              APPROVAL INFORMATION
+          ================================================= */}
+
+          {dialog === "approve" && (
+            <Alert variant="success">
+
+              <div className="fw-semibold mb-1">
+
+                Final PO Approval — {approvalLevel}
+
+              </div>
+
+              <div className="small">
+
+                Confirm that item, quantity, rate, GST,
+                amounts and commercial terms have been
+                verified.
+
+              </div>
+
+            </Alert>
+          )}
+
+          {/* =================================================
+              LABEL
+          ================================================= */}
+
           <Form.Label>
+
             {[
               "reject",
               "cancel",
               "revise",
-            ].includes(dialog)
+            ].includes(
+              dialog
+            )
               ? "Reason *"
               : "Comment / Remarks"}
+
           </Form.Label>
+
+          {/* =================================================
+              TEXT
+          ================================================= */}
 
           <Form.Control
             as="textarea"
             rows={4}
-            value={text}
+            value={
+              text
+            }
             onChange={(e) =>
               setText(
                 e.target.value
               )
             }
-            placeholder="Enter details..."
+            placeholder={
+              dialog === "reject"
+                ? "Enter rejection reason..."
+                : dialog === "approve"
+                ? "Enter approval remarks..."
+                : dialog === "submit" &&
+                  isFinalApprover
+                ? "Enter finalization remarks..."
+                : "Enter details..."
+            }
           />
+
         </Modal.Body>
 
         <Modal.Footer>
+
           <Button
             variant="outline-secondary"
-            onClick={() =>
-              setDialog(null)
-            }
+            onClick={() => {
+              setDialog(null);
+              setText("");
+            }}
           >
             Cancel
           </Button>
@@ -1477,33 +2134,57 @@ export default function PODetailPage() {
               [
                 "reject",
                 "cancel",
-              ].includes(dialog)
+              ].includes(
+                dialog
+              )
                 ? "danger"
+                : dialog === "approve"
+                ? "success"
+                : dialog === "submit" &&
+                  isFinalApprover
+                ? "success"
                 : "primary"
             }
             disabled={
               mutate.isPending ||
-              ([
-                "reject",
-                "cancel",
-                "revise",
-              ].includes(
-                dialog
-              ) &&
-                !text.trim())
+              (
+                [
+                  "reject",
+                  "cancel",
+                  "revise",
+                ].includes(
+                  dialog
+                ) &&
+                !text.trim()
+              )
             }
             onClick={
               confirmDialog
             }
           >
-            Confirm
+            {mutate.isPending
+              ? "Processing..."
+              : dialog === "submit" &&
+                isFinalApprover
+              ? "Finalize PO"
+              : dialog === "submit"
+              ? "Submit for Approval"
+              : dialog === "approve"
+              ? "Approve PO"
+              : dialog === "reject"
+              ? "Reject PO"
+              : "Confirm"}
+
           </Button>
+
         </Modal.Footer>
+
       </Modal>
 
       {/* =====================================================
           EMAIL MODAL
       ===================================================== */}
+
       <Modal
         show={
           dialog === "email"
@@ -1513,14 +2194,21 @@ export default function PODetailPage() {
         }
         centered
       >
+
         <Modal.Header closeButton>
+
           <Modal.Title>
             Email Purchase Order
           </Modal.Title>
+
         </Modal.Header>
 
         <Modal.Body>
+
+          {/* TO */}
+
           <Form.Group className="mb-3">
+
             <Form.Label>
               To *
             </Form.Label>
@@ -1534,14 +2222,17 @@ export default function PODetailPage() {
                 setEmail({
                   ...email,
                   to:
-                    e.target
-                      .value,
+                    e.target.value,
                 })
               }
             />
+
           </Form.Group>
 
+          {/* CC */}
+
           <Form.Group className="mb-3">
+
             <Form.Label>
               CC
             </Form.Label>
@@ -1554,14 +2245,17 @@ export default function PODetailPage() {
                 setEmail({
                   ...email,
                   cc:
-                    e.target
-                      .value,
+                    e.target.value,
                 })
               }
             />
+
           </Form.Group>
 
+          {/* SUBJECT */}
+
           <Form.Group className="mb-3">
+
             <Form.Label>
               Subject
             </Form.Label>
@@ -1574,14 +2268,17 @@ export default function PODetailPage() {
                 setEmail({
                   ...email,
                   subject:
-                    e.target
-                      .value,
+                    e.target.value,
                 })
               }
             />
+
           </Form.Group>
 
+          {/* MESSAGE */}
+
           <Form.Group>
+
             <Form.Label>
               Message
             </Form.Label>
@@ -1596,15 +2293,17 @@ export default function PODetailPage() {
                 setEmail({
                   ...email,
                   message:
-                    e.target
-                      .value,
+                    e.target.value,
                 })
               }
             />
+
           </Form.Group>
+
         </Modal.Body>
 
         <Modal.Footer>
+
           <Button
             variant="outline-secondary"
             onClick={() =>
@@ -1627,8 +2326,10 @@ export default function PODetailPage() {
               ? "Sending..."
               : "Send Email"}
           </Button>
+
         </Modal.Footer>
+
       </Modal>
     </>
   );
-}
+} 

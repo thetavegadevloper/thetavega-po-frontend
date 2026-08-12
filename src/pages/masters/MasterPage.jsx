@@ -12,13 +12,17 @@ import {
   Form,
   Modal,
   Row,
+  Spinner,
   Table
 } from "react-bootstrap";
 
 import toast from "react-hot-toast";
 
 import { masterApi } from "../../api/masterApi";
-import { API_BASE_URL } from "../../api/http";
+
+import http, {
+  API_BASE_URL
+} from "../../api/http";
 
 import PageHeader from "../../components/common/PageHeader";
 import LoadingBlock from "../../components/common/LoadingBlock";
@@ -35,15 +39,6 @@ import {
 
 // =====================================================
 // BACKEND BASE URL
-//
-// API_BASE_URL:
-// http://localhost:5000/api
-//
-// Attachment URL:
-// /attachments/filename.pdf
-//
-// Final:
-// http://localhost:5000/attachments/filename.pdf
 // =====================================================
 const BACKEND_BASE_URL =
   API_BASE_URL.replace(
@@ -52,7 +47,161 @@ const BACKEND_BASE_URL =
   );
 
 // =====================================================
-// CHECK IF VALUE IS BROWSER FILE
+// INDIA STATE OPTIONS
+// =====================================================
+const INDIA_STATE_OPTIONS = [
+  {
+    code: "01",
+    name: "Jammu and Kashmir"
+  },
+  {
+    code: "02",
+    name: "Himachal Pradesh"
+  },
+  {
+    code: "03",
+    name: "Punjab"
+  },
+  {
+    code: "04",
+    name: "Chandigarh"
+  },
+  {
+    code: "05",
+    name: "Uttarakhand"
+  },
+  {
+    code: "06",
+    name: "Haryana"
+  },
+  {
+    code: "07",
+    name: "Delhi"
+  },
+  {
+    code: "08",
+    name: "Rajasthan"
+  },
+  {
+    code: "09",
+    name: "Uttar Pradesh"
+  },
+  {
+    code: "10",
+    name: "Bihar"
+  },
+  {
+    code: "11",
+    name: "Sikkim"
+  },
+  {
+    code: "12",
+    name: "Arunachal Pradesh"
+  },
+  {
+    code: "13",
+    name: "Nagaland"
+  },
+  {
+    code: "14",
+    name: "Manipur"
+  },
+  {
+    code: "15",
+    name: "Mizoram"
+  },
+  {
+    code: "16",
+    name: "Tripura"
+  },
+  {
+    code: "17",
+    name: "Meghalaya"
+  },
+  {
+    code: "18",
+    name: "Assam"
+  },
+  {
+    code: "19",
+    name: "West Bengal"
+  },
+  {
+    code: "20",
+    name: "Jharkhand"
+  },
+  {
+    code: "21",
+    name: "Odisha"
+  },
+  {
+    code: "22",
+    name: "Chhattisgarh"
+  },
+  {
+    code: "23",
+    name: "Madhya Pradesh"
+  },
+  {
+    code: "24",
+    name: "Gujarat"
+  },
+  {
+    code: "25",
+    name: "Daman and Diu"
+  },
+  {
+    code: "26",
+    name: "Dadra and Nagar Haveli and Daman and Diu"
+  },
+  {
+    code: "27",
+    name: "Maharashtra"
+  },
+  {
+    code: "29",
+    name: "Karnataka"
+  },
+  {
+    code: "30",
+    name: "Goa"
+  },
+  {
+    code: "31",
+    name: "Lakshadweep"
+  },
+  {
+    code: "32",
+    name: "Kerala"
+  },
+  {
+    code: "33",
+    name: "Tamil Nadu"
+  },
+  {
+    code: "34",
+    name: "Puducherry"
+  },
+  {
+    code: "35",
+    name: "Andaman and Nicobar Islands"
+  },
+  {
+    code: "36",
+    name: "Telangana"
+  },
+  {
+    code: "37",
+    name: "Andhra Pradesh"
+  },
+  {
+    code: "38",
+    name: "Ladakh"
+  }
+];
+
+// =====================================================
+// CHECK FILE
 // =====================================================
 function isFile(value) {
   return (
@@ -62,7 +211,7 @@ function isFile(value) {
 }
 
 // =====================================================
-// GET ATTACHMENT URL
+// ATTACHMENT URL
 // =====================================================
 function getAttachmentUrl(file) {
   if (!file) {
@@ -76,7 +225,6 @@ function getAttachmentUrl(file) {
     return "";
   }
 
-  // Already absolute URL
   if (
     url.startsWith("http://") ||
     url.startsWith("https://")
@@ -84,7 +232,6 @@ function getAttachmentUrl(file) {
     return url;
   }
 
-  // Relative backend URL
   return `${BACKEND_BASE_URL}${
     url.startsWith("/")
       ? url
@@ -93,7 +240,7 @@ function getAttachmentUrl(file) {
 }
 
 // =====================================================
-// VIEW FILE LINK
+// VIEW FILE
 // =====================================================
 function ViewFileLink({
   file,
@@ -109,7 +256,9 @@ function ViewFileLink({
     "";
 
   const url =
-    getAttachmentUrl(file);
+    getAttachmentUrl(
+      file
+    );
 
   if (!url) {
     return (
@@ -121,6 +270,7 @@ function ViewFileLink({
 
   return (
     <div className="d-flex align-items-center gap-2 flex-wrap">
+
       {showName && (
         <span>
           {fileName}
@@ -132,17 +282,18 @@ function ViewFileLink({
         target="_blank"
         rel="noopener noreferrer"
         className="btn btn-sm btn-outline-primary"
-        title={`Open ${fileName}`}
       >
         <i className="bi bi-eye me-1" />
+
         View
       </a>
+
     </div>
   );
 }
 
 // =====================================================
-// FIELD
+// GENERIC FIELD
 // =====================================================
 function Field({
   field,
@@ -150,26 +301,36 @@ function Field({
   onChange
 }) {
   // ===================================================
-  // FILE FIELD
+  // FILE
   // ===================================================
-  if (field.type === "file") {
+  if (
+    field.type === "file"
+  ) {
     return (
       <>
         <Form.Control
           type="file"
-          accept={field.accept}
+          accept={
+            field.accept
+          }
           multiple={Boolean(
             field.multiple
           )}
-          onChange={(event) => {
+          onChange={(
+            event
+          ) => {
             const files =
               Array.from(
                 event.target.files ||
                   []
               );
 
-            if (field.multiple) {
-              onChange(files);
+            if (
+              field.multiple
+            ) {
+              onChange(
+                files
+              );
             } else {
               onChange(
                 files[0] ||
@@ -179,44 +340,52 @@ function Field({
           }}
         />
 
-        {/* =============================================
-            EXISTING SINGLE FILE
-        ============================================= */}
         {!field.multiple &&
           value &&
-          !isFile(value) &&
+          !isFile(
+            value
+          ) &&
           value?.originalName && (
             <div className="mt-2">
+
               <div className="small text-secondary mb-1">
                 Current file:
               </div>
 
               <ViewFileLink
-                file={value}
+                file={
+                  value
+                }
               />
+
             </div>
           )}
 
-        {/* =============================================
-            NEW SINGLE FILE
-        ============================================= */}
         {!field.multiple &&
-          isFile(value) && (
+          isFile(
+            value
+          ) && (
             <div className="small text-primary mt-1">
+
               Selected:{" "}
+
               <strong>
-                {value.name}
+                {
+                  value.name
+                }
               </strong>
+
             </div>
           )}
 
-        {/* =============================================
-            SUPPORTING FILES
-        ============================================= */}
         {field.multiple &&
-          Array.isArray(value) &&
-          value.length > 0 && (
+          Array.isArray(
+            value
+          ) &&
+          value.length >
+            0 && (
             <div className="mt-2">
+
               {value.map(
                 (
                   file,
@@ -231,21 +400,33 @@ function Field({
                     }
                     className="mb-2"
                   >
-                    {isFile(file) ? (
+
+                    {isFile(
+                      file
+                    ) ? (
                       <div className="small text-primary">
+
                         Selected:{" "}
+
                         <strong>
-                          {file.name}
+                          {
+                            file.name
+                          }
                         </strong>
+
                       </div>
                     ) : (
                       <ViewFileLink
-                        file={file}
+                        file={
+                          file
+                        }
                       />
                     )}
+
                   </div>
                 )
               )}
+
             </div>
           )}
       </>
@@ -253,7 +434,7 @@ function Field({
   }
 
   // ===================================================
-  // EXISTING COMMON FIELD LOGIC
+  // COMMON INPUT PROPS
   // ===================================================
   const common = {
     value:
@@ -265,11 +446,19 @@ function Field({
     checked:
       field.type ===
       "checkbox"
-        ? Boolean(value)
+        ? Boolean(
+            value
+          )
         : undefined,
 
     required:
       field.required,
+
+    readOnly:
+      field.readOnly,
+
+    disabled:
+      field.disabled,
 
     onChange: (
       event
@@ -282,7 +471,9 @@ function Field({
       ) {
         next =
           event.target.checked;
-      } else if (
+      }
+
+      else if (
         field.type ===
         "number"
       ) {
@@ -291,15 +482,18 @@ function Field({
           ""
             ? ""
             : Number(
-                event.target
-                  .value
+                event.target.value
               );
-      } else {
+      }
+
+      else {
         next =
           event.target.value;
       }
 
-      onChange(next);
+      onChange(
+        next
+      );
     }
   };
 
@@ -307,27 +501,52 @@ function Field({
   // SELECT
   // ===================================================
   if (
-    field.type === "select"
+    field.type ===
+    "select"
   ) {
     return (
       <Form.Select
         {...common}
       >
+
         <option value="">
           Select...
         </option>
 
         {(field.options ||
           []).map(
-          (option) => (
-            <option
-              key={option}
-              value={option}
-            >
-              {option}
-            </option>
-          )
+          (
+            option
+          ) => {
+            const optionValue =
+              typeof option ===
+              "object"
+                ? option.value
+                : option;
+
+            const optionLabel =
+              typeof option ===
+              "object"
+                ? option.label
+                : option;
+
+            return (
+              <option
+                key={
+                  optionValue
+                }
+                value={
+                  optionValue
+                }
+              >
+                {
+                  optionLabel
+                }
+              </option>
+            );
+          }
         )}
+
       </Form.Select>
     );
   }
@@ -343,7 +562,8 @@ function Field({
       <Form.Control
         as="textarea"
         rows={
-          field.rows || 3
+          field.rows ||
+          3
         }
         {...common}
       />
@@ -369,7 +589,7 @@ function Field({
   }
 
   // ===================================================
-  // NORMAL INPUT
+  // NORMAL
   // ===================================================
   return (
     <Form.Control
@@ -394,7 +614,6 @@ function TableCell({
 }) {
   // ===================================================
   // GST CERTIFICATE
-  // ONLY VIEW BUTTON
   // ===================================================
   if (
     path ===
@@ -409,15 +628,18 @@ function TableCell({
 
     return (
       <ViewFileLink
-        file={file}
-        showName={false}
+        file={
+          file
+        }
+        showName={
+          false
+        }
       />
     );
   }
 
   // ===================================================
   // PAN CARD
-  // ONLY VIEW BUTTON
   // ===================================================
   if (
     path ===
@@ -432,15 +654,18 @@ function TableCell({
 
     return (
       <ViewFileLink
-        file={file}
-        showName={false}
+        file={
+          file
+        }
+        showName={
+          false
+        }
       />
     );
   }
 
   // ===================================================
   // SUPPORTING FILES
-  // ONLY VIEW BUTTON
   // ===================================================
   if (
     path ===
@@ -450,14 +675,18 @@ function TableCell({
       row.supportingFiles;
 
     if (
-      !Array.isArray(files) ||
-      files.length === 0
+      !Array.isArray(
+        files
+      ) ||
+      files.length ===
+        0
     ) {
       return "-";
     }
 
     return (
       <div className="d-flex flex-column gap-1">
+
         {files.map(
           (
             file,
@@ -469,11 +698,16 @@ function TableCell({
                 file?.originalName ||
                 index
               }
-              file={file}
-              showName={false}
+              file={
+                file
+              }
+              showName={
+                false
+              }
             />
           )
         )}
+
       </div>
     );
   }
@@ -488,7 +722,8 @@ function TableCell({
     );
 
   return String(
-    value ?? "-"
+    value ??
+      "-"
   );
 }
 
@@ -501,9 +736,6 @@ function buildVendorFormData(
   const formData =
     new FormData();
 
-  // ===================================================
-  // NORMAL VENDOR FIELDS
-  // ===================================================
   const normalFields = [
     "vendorCode",
     "vendorName",
@@ -520,18 +752,23 @@ function buildVendorFormData(
   ];
 
   normalFields.forEach(
-    (field) => {
+    (
+      field
+    ) => {
       const value =
         data[field];
 
       if (
         value !==
           undefined &&
-        value !== null
+        value !==
+          null
       ) {
         formData.append(
           field,
-          String(value)
+          String(
+            value
+          )
         );
       }
     }
@@ -596,9 +833,13 @@ function buildVendorFormData(
     )
   ) {
     data.supportingFiles.forEach(
-      (file) => {
+      (
+        file
+      ) => {
         if (
-          isFile(file)
+          isFile(
+            file
+          )
         ) {
           formData.append(
             "supportingFiles",
@@ -613,6 +854,20 @@ function buildVendorFormData(
 }
 
 // =====================================================
+// NORMALIZE TEXT
+// =====================================================
+function normalizeText(
+  value
+) {
+  return String(
+    value ||
+    ""
+  )
+    .trim()
+    .toLowerCase();
+}
+
+// =====================================================
 // MASTER PAGE
 // =====================================================
 export default function MasterPage({
@@ -624,35 +879,138 @@ export default function MasterPage({
   const [
     page,
     setPage
-  ] = useState(1);
+  ] =
+    useState(1);
 
   const [
     search,
     setSearch
-  ] = useState("");
+  ] =
+    useState("");
 
   const [
     activeFilter,
     setActiveFilter
-  ] = useState("");
+  ] =
+    useState("");
 
   const [
     show,
     setShow
-  ] = useState(false);
+  ] =
+    useState(false);
 
   const [
     editing,
     setEditing
-  ] = useState(null);
+  ] =
+    useState(null);
 
   const [
     form,
     setForm
-  ] = useState(
-    config.initial ||
-      {}
-  );
+  ] =
+    useState(
+      config.initial ||
+        {}
+    );
+
+  // ===================================================
+  // AUTO CODE CONFIGURATION
+  //
+  // Example:
+  //
+  // config.autoCode = {
+  //   enabled: true,
+  //   field: "vendorCode"
+  // }
+  // ===================================================
+  const autoCodeConfig =
+    config.autoCode ||
+    null;
+
+  const hasAutoCode =
+    Boolean(
+      autoCodeConfig?.enabled &&
+      autoCodeConfig?.field
+    );
+
+  // ===================================================
+  // AUTO CODE LOADING
+  // ===================================================
+  const [
+    codeLoading,
+    setCodeLoading
+  ] =
+    useState(false);
+
+  // ===================================================
+  // GST / ADDRESS CONFIGURATION
+  //
+  // COMPANY
+  // VENDOR
+  // DELIVERY ADDRESS
+  //
+  // can all use same logic.
+  // ===================================================
+  const gstConfig =
+    config.gstAutoFill ||
+    null;
+
+  const hasGSTAutoFill =
+    Boolean(
+      gstConfig?.enabled
+    );
+
+  const hasAddressAutoFill =
+    Boolean(
+      config.addressAutoFill
+    );
+
+  // ===================================================
+  // GST LOADING
+  // ===================================================
+  const [
+    gstLoading,
+    setGstLoading
+  ] =
+    useState(false);
+
+  // ===================================================
+  // CITY OPTIONS
+  // ===================================================
+  const [
+    cityLoading,
+    setCityLoading
+  ] =
+    useState(false);
+
+  const [
+    cityOptions,
+    setCityOptions
+  ] =
+    useState([]);
+
+  // ===================================================
+  // AREA / POST OFFICE OPTIONS
+  // ===================================================
+  const [
+    areaLoading,
+    setAreaLoading
+  ] =
+    useState(false);
+
+  const [
+    areaOptions,
+    setAreaOptions
+  ] =
+    useState([]);
+
+  const [
+    selectedAreaIndex,
+    setSelectedAreaIndex
+  ] =
+    useState("");
 
   // ===================================================
   // QUERY
@@ -716,13 +1074,31 @@ export default function MasterPage({
           }`
         );
 
-        setShow(false);
+        setShow(
+          false
+        );
 
-        setEditing(null);
+        setEditing(
+          null
+        );
 
         setForm(
-          config.initial ||
-            {}
+          structuredClone(
+            config.initial ||
+              {}
+          )
+        );
+
+        setCityOptions(
+          []
+        );
+
+        setAreaOptions(
+          []
+        );
+
+        setSelectedAreaIndex(
+          ""
         );
 
         qc.invalidateQueries({
@@ -782,11 +1158,147 @@ export default function MasterPage({
     });
 
   // ===================================================
+  // RESET SMART ADDRESS
+  // ===================================================
+  function resetAddressLookup() {
+    setCityOptions(
+      []
+    );
+
+    setAreaOptions(
+      []
+    );
+
+    setSelectedAreaIndex(
+      ""
+    );
+  }
+
+  // ===================================================
+  // GENERATE NEXT MASTER CODE
+  //
+  // Examples:
+  //
+  // /vendors
+  // -> master = vendors
+  // -> TT01
+  //
+  // /companies
+  // -> master = companies
+  // -> CMP01
+  //
+  // /materials
+  // -> master = materials
+  // -> MAT001
+  // ===================================================
+  async function loadNextCode() {
+    if (
+      !hasAutoCode
+    ) {
+      return "";
+    }
+
+    setCodeLoading(
+      true
+    );
+
+    try {
+      // =================================================
+      // REMOVE LEADING /
+      //
+      // /vendors
+      // becomes
+      // vendors
+      // =================================================
+      const master =
+        String(
+          config.endpoint ||
+          ""
+        )
+          .replace(
+            /^\/+/,
+            ""
+          )
+          .trim();
+
+      if (!master) {
+        throw new Error(
+          "Master endpoint is missing"
+        );
+      }
+
+      const response =
+        await http.get(
+          "/master-code/next",
+          {
+            params: {
+              master
+            }
+          }
+        );
+
+      const generatedCode =
+        response.data?.data
+          ?.code ||
+        "";
+
+      if (
+        !generatedCode
+      ) {
+        throw new Error(
+          "Code could not be generated"
+        );
+      }
+
+      // =================================================
+      // PUT GENERATED CODE INTO CONFIGURED FIELD
+      // =================================================
+      setForm(
+        (
+          previous
+        ) =>
+          setByPath(
+            previous,
+            autoCodeConfig.field,
+            generatedCode
+          )
+      );
+
+      return generatedCode;
+    } catch (
+      error
+    ) {
+      console.error(
+        "[MASTER AUTO CODE]",
+        error
+      );
+
+      toast.error(
+        getApiError(
+          error,
+          "Unable to generate code"
+        )
+      );
+
+      return "";
+    } finally {
+      setCodeLoading(
+        false
+      );
+    }
+  }
+
+  // ===================================================
   // NEW
   // ===================================================
-  function openNew() {
-    setEditing(null);
+  async function openNew() {
+    setEditing(
+      null
+    );
 
+    // =================================================
+    // RESET FORM FIRST
+    // =================================================
     setForm(
       structuredClone(
         config.initial ||
@@ -794,7 +1306,22 @@ export default function MasterPage({
       )
     );
 
-    setShow(true);
+    resetAddressLookup();
+
+    setShow(
+      true
+    );
+
+    // =================================================
+    // GENERATE CODE ONLY FOR NEW RECORD
+    //
+    // NEVER GENERATE NEW CODE DURING EDIT.
+    // =================================================
+    if (
+      hasAutoCode
+    ) {
+      await loadNextCode();
+    }
   }
 
   // ===================================================
@@ -803,15 +1330,1463 @@ export default function MasterPage({
   function openEdit(
     row
   ) {
-    setEditing(row);
+    setEditing(
+      row
+    );
 
+    // =================================================
+    // KEEP EXISTING SAVED CODE
+    // =================================================
     setForm(
       structuredClone(
         row
       )
     );
 
-    setShow(true);
+    resetAddressLookup();
+
+    setShow(
+      true
+    );
+
+    // =================================================
+    // LOAD EXISTING STATE -> CITY OPTIONS
+    // =================================================
+    if (
+      hasAddressAutoFill
+    ) {
+      const state =
+        getByPath(
+          row,
+          "registeredAddress.state"
+        );
+
+      const city =
+        getByPath(
+          row,
+          "registeredAddress.city"
+        );
+
+      if (state) {
+        loadCities(
+          state
+        );
+
+        if (city) {
+          loadAreas(
+            state,
+            city,
+            true
+          );
+        }
+      }
+    }
+  }
+
+  // ===================================================
+  // SET FIELD
+  // ===================================================
+  function setField(
+    path,
+    value
+  ) {
+    setForm(
+      (
+        previous
+      ) =>
+        setByPath(
+          previous,
+          path,
+          value
+        )
+    );
+  }
+
+  // ===================================================
+  // LOAD CITIES
+  //
+  // State -> Cities
+  // ===================================================
+  async function loadCities(
+    stateName
+  ) {
+    const state =
+      String(
+        stateName ||
+        ""
+      ).trim();
+
+    if (
+      !hasAddressAutoFill ||
+      !state
+    ) {
+      setCityOptions(
+        []
+      );
+
+      return [];
+    }
+
+    setCityLoading(
+      true
+    );
+
+    try {
+      const response =
+        await http.get(
+          "/companies/location/cities",
+          {
+            params: {
+              state
+            }
+          }
+        );
+
+      const cities =
+        response.data?.data
+          ?.cities ||
+        [];
+
+      setCityOptions(
+        cities
+      );
+
+      return cities;
+    } catch (
+      error
+    ) {
+      setCityOptions(
+        []
+      );
+
+      toast.error(
+        getApiError(
+          error,
+          "Unable to load cities"
+        )
+      );
+
+      return [];
+    } finally {
+      setCityLoading(
+        false
+      );
+    }
+  }
+
+  // ===================================================
+  // LOAD AREAS / POST OFFICES
+  //
+  // State + City -> Areas
+  // ===================================================
+  async function loadAreas(
+    stateName,
+    cityName,
+    silent = false
+  ) {
+    const state =
+      String(
+        stateName ||
+        ""
+      ).trim();
+
+    const city =
+      String(
+        cityName ||
+        ""
+      ).trim();
+
+    if (
+      !hasAddressAutoFill ||
+      !state ||
+      !city
+    ) {
+      setAreaOptions(
+        []
+      );
+
+      return [];
+    }
+
+    setAreaLoading(
+      true
+    );
+
+    setAreaOptions(
+      []
+    );
+
+    setSelectedAreaIndex(
+      ""
+    );
+
+    try {
+      const response =
+        await http.get(
+          "/companies/location/areas",
+          {
+            params: {
+              state,
+              city
+            }
+          }
+        );
+
+      const areas =
+        response.data?.data
+          ?.areas ||
+        [];
+
+      setAreaOptions(
+        areas
+      );
+
+      return areas;
+    } catch (
+      error
+    ) {
+      setAreaOptions(
+        []
+      );
+
+      if (!silent) {
+        toast.error(
+          getApiError(
+            error,
+            "Unable to load Area / Post Office"
+          )
+        );
+      }
+
+      return [];
+    } finally {
+      setAreaLoading(
+        false
+      );
+    }
+  }
+
+  // ===================================================
+  // GST LOOKUP
+  //
+  // Works dynamically based on config:
+  //
+  // Company:
+  // gstin -> pan
+  //
+  // Vendor:
+  // gstNo -> panNo
+  //
+  // Delivery:
+  // gstNo -> panNo
+  // ===================================================
+  async function lookupGST(
+    value
+  ) {
+    if (
+      !hasGSTAutoFill
+    ) {
+      return;
+    }
+
+    const gstin =
+      String(
+        value ||
+        ""
+      )
+        .trim()
+        .toUpperCase();
+
+    if (
+      gstin.length !==
+      15
+    ) {
+      return;
+    }
+
+    setGstLoading(
+      true
+    );
+
+    try {
+      const response =
+        await http.get(
+          `/companies/gst/${encodeURIComponent(
+            gstin
+          )}`
+        );
+
+      const data =
+        response.data?.data;
+
+      if (!data) {
+        return;
+      }
+
+      const gstField =
+        gstConfig.gstField;
+
+      const panField =
+        gstConfig.panField;
+
+      const gstStateField =
+        gstConfig.gstStateField;
+
+      const gstStateCodeField =
+        gstConfig.gstStateCodeField;
+
+      const addressStateField =
+        gstConfig.addressStateField ||
+        "registeredAddress.state";
+
+      const addressStateCodeField =
+        gstConfig.addressStateCodeField ||
+        "registeredAddress.stateCode";
+
+      setForm(
+        (
+          previous
+        ) => {
+          let next =
+            structuredClone(
+              previous
+            );
+
+          // =============================================
+          // GST NUMBER
+          // =============================================
+          if (
+            gstField
+          ) {
+            next =
+              setByPath(
+                next,
+                gstField,
+                data.gstin ||
+                  gstin
+              );
+          }
+
+          // =============================================
+          // PAN
+          // =============================================
+          if (
+            panField
+          ) {
+            next =
+              setByPath(
+                next,
+                panField,
+                data.pan ||
+                  ""
+              );
+          }
+
+          // =============================================
+          // TOP LEVEL GST STATE
+          // COMPANY
+          // =============================================
+          if (
+            gstStateField
+          ) {
+            next =
+              setByPath(
+                next,
+                gstStateField,
+                data.gstState ||
+                  ""
+              );
+          }
+
+          // =============================================
+          // TOP LEVEL GST STATE CODE
+          // COMPANY
+          // =============================================
+          if (
+            gstStateCodeField
+          ) {
+            next =
+              setByPath(
+                next,
+                gstStateCodeField,
+                data.stateCode ||
+                  ""
+              );
+          }
+
+          // =============================================
+          // CURRENT ADDRESS STATE
+          // =============================================
+          const currentAddressState =
+            getByPath(
+              next,
+              addressStateField
+            );
+
+          const stateChanged =
+            normalizeText(
+              currentAddressState
+            ) !==
+            normalizeText(
+              data.gstState
+            );
+
+          // =============================================
+          // ADDRESS STATE
+          // =============================================
+          next =
+            setByPath(
+              next,
+              addressStateField,
+              data.gstState ||
+                ""
+            );
+
+          // =============================================
+          // ADDRESS STATE CODE
+          // =============================================
+          next =
+            setByPath(
+              next,
+              addressStateCodeField,
+              data.stateCode ||
+                ""
+            );
+
+          // =============================================
+          // IF STATE CHANGED
+          //
+          // CLEAR CITY / DISTRICT / PINCODE
+          // =============================================
+          if (
+            stateChanged
+          ) {
+            next =
+              setByPath(
+                next,
+                "registeredAddress.city",
+                ""
+              );
+
+            next =
+              setByPath(
+                next,
+                "registeredAddress.district",
+                ""
+              );
+
+            next =
+              setByPath(
+                next,
+                "registeredAddress.pincode",
+                ""
+              );
+          }
+
+          // =============================================
+          // COUNTRY
+          // =============================================
+          next =
+            setByPath(
+              next,
+              "registeredAddress.country",
+              "India"
+            );
+
+          return next;
+        }
+      );
+
+      // =================================================
+      // AUTO LOAD CITY DROPDOWN
+      // =================================================
+      if (
+        hasAddressAutoFill &&
+        data.gstState
+      ) {
+        setAreaOptions(
+          []
+        );
+
+        setSelectedAreaIndex(
+          ""
+        );
+
+        await loadCities(
+          data.gstState
+        );
+      }
+
+      toast.success(
+        "GSTIN validated"
+      );
+    } catch (
+      error
+    ) {
+      toast.error(
+        getApiError(
+          error,
+          "Invalid GSTIN"
+        )
+      );
+    } finally {
+      setGstLoading(
+        false
+      );
+    }
+  }
+
+  // ===================================================
+  // STATE CHANGE
+  //
+  // Used by:
+  // Company
+  // Vendor
+  // Delivery Address
+  // ===================================================
+  async function changeAddressState(
+    stateName
+  ) {
+    const selectedState =
+      INDIA_STATE_OPTIONS.find(
+        (
+          item
+        ) =>
+          item.name ===
+          stateName
+      );
+
+    setForm(
+      (
+        previous
+      ) => {
+        let next =
+          structuredClone(
+            previous
+          );
+
+        next =
+          setByPath(
+            next,
+            "registeredAddress.state",
+            stateName
+          );
+
+        next =
+          setByPath(
+            next,
+            "registeredAddress.stateCode",
+            selectedState?.code ||
+              ""
+          );
+
+        // =============================================
+        // CLEAR DEPENDENT LOCATION
+        // =============================================
+        next =
+          setByPath(
+            next,
+            "registeredAddress.city",
+            ""
+          );
+
+        next =
+          setByPath(
+            next,
+            "registeredAddress.district",
+            ""
+          );
+
+        next =
+          setByPath(
+            next,
+            "registeredAddress.pincode",
+            ""
+          );
+
+        next =
+          setByPath(
+            next,
+            "registeredAddress.country",
+            "India"
+          );
+
+        return next;
+      }
+    );
+
+    setAreaOptions(
+      []
+    );
+
+    setSelectedAreaIndex(
+      ""
+    );
+
+    if (
+      stateName
+    ) {
+      await loadCities(
+        stateName
+      );
+    } else {
+      setCityOptions(
+        []
+      );
+    }
+  }
+
+  // ===================================================
+  // CITY CHANGE
+  // ===================================================
+  async function changeCity(
+    cityName
+  ) {
+    const state =
+      getByPath(
+        form,
+        "registeredAddress.state"
+      );
+
+    setForm(
+      (
+        previous
+      ) => {
+        let next =
+          structuredClone(
+            previous
+          );
+
+        next =
+          setByPath(
+            next,
+            "registeredAddress.city",
+            cityName
+          );
+
+        // =============================================
+        // CLEAR AREA DEPENDENT VALUES
+        // =============================================
+        next =
+          setByPath(
+            next,
+            "registeredAddress.district",
+            ""
+          );
+
+        next =
+          setByPath(
+            next,
+            "registeredAddress.pincode",
+            ""
+          );
+
+        return next;
+      }
+    );
+
+    setAreaOptions(
+      []
+    );
+
+    setSelectedAreaIndex(
+      ""
+    );
+
+    if (
+      state &&
+      cityName
+    ) {
+      await loadAreas(
+        state,
+        cityName
+      );
+    }
+  }
+
+  // ===================================================
+  // SELECT AREA / POST OFFICE
+  // ===================================================
+  function selectArea(
+    indexValue
+  ) {
+    setSelectedAreaIndex(
+      indexValue
+    );
+
+    if (
+      indexValue ===
+      ""
+    ) {
+      return;
+    }
+
+    const area =
+      areaOptions[
+        Number(
+          indexValue
+        )
+      ];
+
+    if (!area) {
+      return;
+    }
+
+    setForm(
+      (
+        previous
+      ) => {
+        let next =
+          structuredClone(
+            previous
+          );
+
+        // =================================================
+        // DISTRICT
+        // =================================================
+        next =
+          setByPath(
+            next,
+            "registeredAddress.district",
+            area.district ||
+              ""
+          );
+
+        // =================================================
+        // PINCODE
+        // =================================================
+        next =
+          setByPath(
+            next,
+            "registeredAddress.pincode",
+            area.pincode ||
+              ""
+          );
+
+        // =================================================
+        // STATE
+        // =================================================
+        next =
+          setByPath(
+            next,
+            "registeredAddress.state",
+            area.state ||
+              getByPath(
+                next,
+                "registeredAddress.state"
+              ) ||
+              ""
+          );
+
+        // =================================================
+        // STATE CODE
+        // =================================================
+        next =
+          setByPath(
+            next,
+            "registeredAddress.stateCode",
+            area.stateCode ||
+              getByPath(
+                next,
+                "registeredAddress.stateCode"
+              ) ||
+              ""
+          );
+
+        // =================================================
+        // COUNTRY
+        // =================================================
+        next =
+          setByPath(
+            next,
+            "registeredAddress.country",
+            area.country ||
+              "India"
+          );
+
+        return next;
+      }
+    );
+
+    toast.success(
+      "Address details filled"
+    );
+  }
+
+  // ===================================================
+  // SMART FIELD RENDER
+  //
+  // Supports:
+  //
+  // Auto Code
+  // GST Auto Fill
+  // Address Auto Fill
+  // ===================================================
+  function renderSmartField(
+    field
+  ) {
+    const value =
+      getByPath(
+        form,
+        field.name
+      );
+
+    const gstField =
+      gstConfig?.gstField ||
+      "";
+
+    const panField =
+      gstConfig?.panField ||
+      "";
+
+    const gstStateField =
+      gstConfig?.gstStateField ||
+      "";
+
+    const gstStateCodeField =
+      gstConfig?.gstStateCodeField ||
+      "";
+
+    // =================================================
+    // AUTO-GENERATED MASTER CODE
+    //
+    // READ ONLY
+    //
+    // New:
+    // Auto generated
+    //
+    // Edit:
+    // Existing saved code retained
+    // =================================================
+    if (
+      hasAutoCode &&
+      field.name ===
+        autoCodeConfig.field
+    ) {
+      return (
+        <div className="position-relative">
+
+          <Form.Control
+            readOnly
+            required={
+              field.required
+            }
+            value={
+              value ||
+              ""
+            }
+            placeholder={
+              codeLoading
+                ? "Generating..."
+                : "Auto generated"
+            }
+          />
+
+          {codeLoading && (
+            <Spinner
+              animation="border"
+              size="sm"
+              style={{
+                position:
+                  "absolute",
+
+                right:
+                  12,
+
+                top:
+                  11
+              }}
+            />
+          )}
+
+          {!editing &&
+            value &&
+            !codeLoading && (
+              <div className="small text-success mt-1">
+
+                <i className="bi bi-check-circle me-1" />
+
+                Generated automatically
+
+              </div>
+            )}
+
+        </div>
+      );
+    }
+
+    // =================================================
+    // GST NUMBER
+    //
+    // Supports:
+    //
+    // Company:
+    // gstin
+    //
+    // Vendor:
+    // gstNo
+    //
+    // Delivery:
+    // gstNo
+    // =================================================
+    if (
+      hasGSTAutoFill &&
+      field.name ===
+        gstField
+    ) {
+      return (
+        <div className="position-relative">
+
+          <Form.Control
+            required={
+              field.required
+            }
+            maxLength={
+              15
+            }
+            value={
+              value ||
+              ""
+            }
+            placeholder="Enter 15 character GSTIN"
+            onChange={(
+              event
+            ) => {
+              const gstValue =
+                String(
+                  event.target.value ||
+                    ""
+                )
+                  .toUpperCase()
+                  .replace(
+                    /\s/g,
+                    ""
+                  )
+                  .slice(
+                    0,
+                    15
+                  );
+
+              setField(
+                gstField,
+                gstValue
+              );
+
+              // =========================================
+              // AUTO LOOKUP ON COMPLETE GST
+              // =========================================
+              if (
+                gstValue.length ===
+                15
+              ) {
+                lookupGST(
+                  gstValue
+                );
+              }
+            }}
+          />
+
+          {gstLoading && (
+            <Spinner
+              animation="border"
+              size="sm"
+              style={{
+                position:
+                  "absolute",
+
+                right:
+                  12,
+
+                top:
+                  11
+              }}
+            />
+          )}
+
+        </div>
+      );
+    }
+
+    // =================================================
+    // PAN
+    //
+    // Company:
+    // pan
+    //
+    // Vendor:
+    // panNo
+    //
+    // Delivery:
+    // panNo
+    //
+    // Auto-filled but editable
+    // =================================================
+    if (
+      hasGSTAutoFill &&
+      panField &&
+      field.name ===
+        panField
+    ) {
+      return (
+        <Form.Control
+          required={
+            field.required
+          }
+          maxLength={
+            10
+          }
+          value={
+            value ||
+            ""
+          }
+          onChange={(
+            event
+          ) =>
+            setField(
+              field.name,
+              String(
+                event.target.value ||
+                  ""
+              )
+                .toUpperCase()
+                .replace(
+                  /\s/g,
+                  ""
+                )
+                .slice(
+                  0,
+                  10
+                )
+            )
+          }
+        />
+      );
+    }
+
+    // =================================================
+    // TOP LEVEL GST STATE CODE
+    //
+    // COMPANY
+    // =================================================
+    if (
+      hasGSTAutoFill &&
+      gstStateCodeField &&
+      field.name ===
+        gstStateCodeField
+    ) {
+      return (
+        <Form.Control
+          readOnly
+          required={
+            field.required
+          }
+          value={
+            value ||
+            ""
+          }
+          placeholder="Auto from GSTIN"
+        />
+      );
+    }
+
+    // =================================================
+    // TOP LEVEL GST STATE
+    //
+    // COMPANY
+    // =================================================
+    if (
+      hasGSTAutoFill &&
+      gstStateField &&
+      field.name ===
+        gstStateField
+    ) {
+      return (
+        <Form.Control
+          readOnly
+          required={
+            field.required
+          }
+          value={
+            value ||
+            ""
+          }
+          placeholder="Auto from GSTIN"
+        />
+      );
+    }
+
+    // =================================================
+    // ADDRESS STATE
+    //
+    // STATE DROPDOWN
+    // =================================================
+    if (
+      hasAddressAutoFill &&
+      field.name ===
+        "registeredAddress.state"
+    ) {
+      return (
+        <Form.Select
+          required={
+            field.required
+          }
+          value={
+            value ||
+            ""
+          }
+          onChange={(
+            event
+          ) =>
+            changeAddressState(
+              event.target.value
+            )
+          }
+        >
+
+          <option value="">
+            Select State
+          </option>
+
+          {INDIA_STATE_OPTIONS.map(
+            (
+              state
+            ) => (
+              <option
+                key={
+                  state.code
+                }
+                value={
+                  state.name
+                }
+              >
+                {
+                  state.name
+                }
+              </option>
+            )
+          )}
+
+        </Form.Select>
+      );
+    }
+
+    // =================================================
+    // ADDRESS STATE CODE
+    // =================================================
+    if (
+      hasAddressAutoFill &&
+      field.name ===
+        "registeredAddress.stateCode"
+    ) {
+      return (
+        <Form.Control
+          readOnly
+          value={
+            value ||
+            ""
+          }
+          placeholder="Auto from State"
+        />
+      );
+    }
+
+    // =================================================
+    // CITY
+    //
+    // State
+    // ↓
+    // City dropdown
+    // ↓
+    // Area / Post Office dropdown
+    // =================================================
+    if (
+      hasAddressAutoFill &&
+      field.name ===
+        "registeredAddress.city"
+    ) {
+      const selectedState =
+        getByPath(
+          form,
+          "registeredAddress.state"
+        );
+
+      const selectedCity =
+        value ||
+        "";
+
+      return (
+        <>
+          {/* =============================================
+              CITY DROPDOWN
+          ============================================= */}
+          <div className="position-relative">
+
+            <Form.Select
+              required={
+                field.required
+              }
+              disabled={
+                !selectedState ||
+                cityLoading
+              }
+              value={
+                selectedCity
+              }
+              onChange={(
+                event
+              ) =>
+                changeCity(
+                  event.target.value
+                )
+              }
+            >
+
+              <option value="">
+                {cityLoading
+                  ? "Loading cities..."
+                  : !selectedState
+                  ? "Select State first"
+                  : "Select City"}
+              </option>
+
+              {cityOptions.map(
+                (
+                  city,
+                  index
+                ) => {
+                  const cityName =
+                    typeof city ===
+                    "string"
+                      ? city
+                      : city.name;
+
+                  return (
+                    <option
+                      key={`${cityName}-${index}`}
+                      value={
+                        cityName
+                      }
+                    >
+                      {
+                        cityName
+                      }
+                    </option>
+                  );
+                }
+              )}
+
+            </Form.Select>
+
+            {cityLoading && (
+              <Spinner
+                animation="border"
+                size="sm"
+                style={{
+                  position:
+                    "absolute",
+
+                  right:
+                    32,
+
+                  top:
+                    11
+                }}
+              />
+            )}
+
+          </div>
+
+          {/* =============================================
+              AREA / POST OFFICE
+          ============================================= */}
+          {selectedCity && (
+            <div className="mt-2">
+
+              <Form.Label className="small fw-semibold mb-1">
+
+                Area / Post Office
+
+              </Form.Label>
+
+              <div className="position-relative">
+
+                <Form.Select
+                  disabled={
+                    areaLoading
+                  }
+                  value={
+                    selectedAreaIndex
+                  }
+                  onChange={(
+                    event
+                  ) =>
+                    selectArea(
+                      event.target.value
+                    )
+                  }
+                >
+
+                  <option value="">
+
+                    {areaLoading
+                      ? "Loading areas..."
+                      : areaOptions.length
+                      ? "Select Area / Post Office"
+                      : "No Area / Post Office available"}
+
+                  </option>
+
+                  {areaOptions.map(
+                    (
+                      area,
+                      index
+                    ) => (
+                      <option
+                        key={`${area.areaName}-${area.pincode}-${index}`}
+                        value={
+                          index
+                        }
+                      >
+
+                        {
+                          area.areaName
+                        }
+
+                        {area.branchType
+                          ? ` - ${area.branchType}`
+                          : ""}
+
+                        {area.pincode
+                          ? ` - ${area.pincode}`
+                          : ""}
+
+                      </option>
+                    )
+                  )}
+
+                </Form.Select>
+
+                {areaLoading && (
+                  <Spinner
+                    animation="border"
+                    size="sm"
+                    style={{
+                      position:
+                        "absolute",
+
+                      right:
+                        32,
+
+                      top:
+                        11
+                    }}
+                  />
+                )}
+
+              </div>
+
+            </div>
+          )}
+        </>
+      );
+    }
+
+    // =================================================
+    // DISTRICT
+    // =================================================
+    if (
+      hasAddressAutoFill &&
+      field.name ===
+        "registeredAddress.district"
+    ) {
+      return (
+        <Form.Control
+          readOnly
+          required={
+            field.required
+          }
+          value={
+            value ||
+            ""
+          }
+          placeholder="Auto from Area / Post Office"
+        />
+      );
+    }
+
+    // =================================================
+    // PINCODE
+    //
+    // NOT ENTERED MANUALLY
+    //
+    // State
+    // ↓
+    // City
+    // ↓
+    // Area
+    // ↓
+    // Pincode
+    // =================================================
+    if (
+      hasAddressAutoFill &&
+      field.name ===
+        "registeredAddress.pincode"
+    ) {
+      return (
+        <Form.Control
+          readOnly
+          required={
+            field.required
+          }
+          value={
+            value ||
+            ""
+          }
+          placeholder="Auto from Area / Post Office"
+        />
+      );
+    }
+
+    // =================================================
+    // COUNTRY
+    // =================================================
+    if (
+      hasAddressAutoFill &&
+      field.name ===
+        "registeredAddress.country"
+    ) {
+      return (
+        <Form.Control
+          readOnly
+          value={
+            value ||
+            "India"
+          }
+        />
+      );
+    }
+
+    // =================================================
+    // NORMAL FIELD
+    // =================================================
+    return (
+      <Field
+        field={
+          field
+        }
+        value={
+          value
+        }
+        onChange={(
+          nextValue
+        ) =>
+          setField(
+            field.name,
+            nextValue
+          )
+        }
+      />
+    );
   }
 
   // ===================================================
@@ -823,7 +2798,33 @@ export default function MasterPage({
     event.preventDefault();
 
     // =================================================
-    // VENDOR ONLY
+    // PREVENT SAVE IF AUTO CODE FAILED
+    // =================================================
+    if (
+      hasAutoCode &&
+      !editing
+    ) {
+      const generatedCode =
+        getByPath(
+          form,
+          autoCodeConfig.field
+        );
+
+      if (
+        !generatedCode
+      ) {
+        toast.error(
+          "Master code is not generated. Please close and open the form again."
+        );
+
+        return;
+      }
+    }
+
+    // =================================================
+    // VENDOR
+    //
+    // Existing GridFS / multipart logic remains same.
     // =================================================
     if (
       config.endpoint ===
@@ -858,7 +2859,7 @@ export default function MasterPage({
     }
 
     // =================================================
-    // ALL OTHER MASTERS - OLD LOGIC
+    // OTHER MASTERS
     // =================================================
     let payload =
       structuredClone(
@@ -921,10 +2922,14 @@ export default function MasterPage({
                 openNew
               }
             >
+
               <i className="bi bi-plus-lg me-1" />
 
               Add{" "}
-              {config.singular}
+              {
+                config.singular
+              }
+
             </Button>
           </PermissionGate>
         }
@@ -954,11 +2959,12 @@ export default function MasterPage({
                   event
                 ) => {
                   setSearch(
-                    event.target
-                      .value
+                    event.target.value
                   );
 
-                  setPage(1);
+                  setPage(
+                    1
+                  );
                 }}
               />
 
@@ -978,11 +2984,12 @@ export default function MasterPage({
                   event
                 ) => {
                   setActiveFilter(
-                    event.target
-                      .value
+                    event.target.value
                   );
 
-                  setPage(1);
+                  setPage(
+                    1
+                  );
                 }}
               >
 
@@ -1037,7 +3044,9 @@ export default function MasterPage({
                               label
                             }
                           >
-                            {label}
+                            {
+                              label
+                            }
                           </th>
                         )
                       )}
@@ -1076,6 +3085,7 @@ export default function MasterPage({
                                   path
                                 }
                               >
+
                                 <TableCell
                                   row={
                                     row
@@ -1084,6 +3094,7 @@ export default function MasterPage({
                                     path
                                   }
                                 />
+
                               </td>
                             )
                           )}
@@ -1097,9 +3108,11 @@ export default function MasterPage({
                                   : "text-bg-secondary"
                               }`}
                             >
+
                               {row.isActive
                                 ? "Active"
                                 : "Inactive"}
+
                             </span>
 
                           </td>
@@ -1116,14 +3129,15 @@ export default function MasterPage({
                                 variant="outline-primary"
                                 size="sm"
                                 className="me-2"
-
                                 onClick={() =>
                                   openEdit(
                                     row
                                   )
                                 }
                               >
+
                                 <i className="bi bi-pencil" />
+
                               </Button>
 
                               <Button
@@ -1132,9 +3146,7 @@ export default function MasterPage({
                                     ? "outline-danger"
                                     : "outline-success"
                                 }
-
                                 size="sm"
-
                                 onClick={() =>
                                   statusMutation.mutate(
                                     {
@@ -1147,6 +3159,7 @@ export default function MasterPage({
                                   )
                                 }
                               >
+
                                 <i
                                   className={`bi ${
                                     row.isActive
@@ -1154,6 +3167,7 @@ export default function MasterPage({
                                       : "bi-play-circle"
                                   }`}
                                 />
+
                               </Button>
 
                             </PermissionGate>
@@ -1197,7 +3211,6 @@ export default function MasterPage({
                 />
 
               </div>
-
             </>
 
           )}
@@ -1207,7 +3220,7 @@ export default function MasterPage({
       </Card>
 
       {/* =================================================
-          ADD / EDIT MODAL
+          MODAL
       ================================================= */}
 
       <Modal
@@ -1217,7 +3230,10 @@ export default function MasterPage({
 
         onHide={() =>
           !save.isPending &&
-          setShow(false)
+          !codeLoading &&
+          setShow(
+            false
+          )
         }
 
         size="lg"
@@ -1232,7 +3248,9 @@ export default function MasterPage({
         >
 
           <Modal.Header
-            closeButton
+            closeButton={
+              !codeLoading
+            }
           >
 
             <Modal.Title>
@@ -1304,33 +3322,47 @@ export default function MasterPage({
 
                       )}
 
-                      <Field
-                        field={
+                      {(
+                        hasAutoCode ||
+                        hasGSTAutoFill ||
+                        hasAddressAutoFill
+                      ) ? (
+
+                        renderSmartField(
                           field
-                        }
+                        )
 
-                        value={
-                          getByPath(
-                            form,
-                            field.name
-                          )
-                        }
+                      ) : (
 
-                        onChange={(
-                          value
-                        ) =>
-                          setForm(
-                            (
-                              previous
-                            ) =>
-                              setByPath(
-                                previous,
-                                field.name,
-                                value
-                              )
-                          )
-                        }
-                      />
+                        <Field
+                          field={
+                            field
+                          }
+
+                          value={
+                            getByPath(
+                              form,
+                              field.name
+                            )
+                          }
+
+                          onChange={(
+                            value
+                          ) =>
+                            setForm(
+                              (
+                                previous
+                              ) =>
+                                setByPath(
+                                  previous,
+                                  field.name,
+                                  value
+                                )
+                            )
+                          }
+                        />
+
+                      )}
 
                     </Col>
                   );
@@ -1347,23 +3379,40 @@ export default function MasterPage({
               type="button"
               variant="outline-secondary"
 
+              disabled={
+                save.isPending ||
+                codeLoading
+              }
+
               onClick={() =>
-                setShow(false)
+                setShow(
+                  false
+                )
               }
             >
+
               Cancel
+
             </Button>
 
             <Button
               type="submit"
 
               disabled={
-                save.isPending
+                save.isPending ||
+                codeLoading ||
+                gstLoading ||
+                cityLoading ||
+                areaLoading
               }
             >
-              {save.isPending
+
+              {codeLoading
+                ? "Generating Code..."
+                : save.isPending
                 ? "Saving..."
                 : "Save"}
+
             </Button>
 
           </Modal.Footer>
@@ -1371,7 +3420,6 @@ export default function MasterPage({
         </Form>
 
       </Modal>
-
     </>
   );
 }

@@ -31,6 +31,15 @@ import { getApiError } from "../../utils/error";
 import { useAuth } from "../../context/AuthContext";
 
 // =====================================================
+// TAXES & DUTIES OPTIONS
+// =====================================================
+const TAXES_DUTIES_OPTIONS = [
+  "EXTRA AT ACTUAL",
+  "INCLUSIVE",
+  "NOT APPLICABLE"
+];
+
+// =====================================================
 // EMPTY ITEM
 // =====================================================
 const emptyItem = () => ({
@@ -106,8 +115,8 @@ const initial = {
 
     paymentSummary: "",
 
-    buyerName: "",
-    buyerContact: "",
+    buyerName: "Tejas Bakliwal",
+    buyerContact: "9999999999",
 
     taxesDutiesText:
       "EXTRA AT ACTUAL",
@@ -166,8 +175,7 @@ export default function POFormPage() {
   const navigate = useNavigate();
 
   const {
-    can,
-    user
+    can
   } = useAuth();
 
   const [form, setForm] =
@@ -259,6 +267,95 @@ export default function POFormPage() {
 
       enabled: editing
     });
+
+  // ===================================================
+  // AUTO SELECT SINGLE COMPANY
+  // ===================================================
+
+  useEffect(() => {
+    if (
+      !editing &&
+      !form.companyId &&
+      companies.data?.data?.length
+    ) {
+      const company =
+        companies.data.data[0];
+
+      setForm(
+        (current) => {
+          if (current.companyId) {
+            return current;
+          }
+
+          return {
+            ...current,
+
+            companyId:
+              company._id
+          };
+        }
+      );
+    }
+  }, [
+    editing,
+    companies.data,
+    form.companyId
+  ]);
+
+  // ===================================================
+  // COMPANY DISPLAY
+  // ===================================================
+
+  const selectedCompany =
+    useMemo(() => {
+      const companyList =
+        companies.data?.data ||
+        [];
+
+      const matchedCompany =
+        companyList.find(
+          (company) =>
+            String(
+              company._id
+            ) ===
+            String(
+              form.companyId
+            )
+        );
+
+      if (matchedCompany) {
+        return matchedCompany;
+      }
+
+      if (
+        editing &&
+        existing.data?.data?.company
+      ) {
+        const existingCompany =
+          existing.data.data.company;
+
+        return {
+          _id:
+            existingCompany.companyId,
+
+          companyCode:
+            existingCompany.companyCode,
+
+          companyName:
+            existingCompany.companyName
+        };
+      }
+
+      return (
+        companyList[0] ||
+        null
+      );
+    }, [
+      companies.data,
+      form.companyId,
+      editing,
+      existing.data
+    ]);
 
   // ===================================================
   // EDIT INITIALIZATION
@@ -375,45 +472,7 @@ export default function POFormPage() {
   ]);
 
   // ===================================================
-  // AUTO BUYER
-  // ===================================================
-
-  useEffect(() => {
-    if (
-      !editing &&
-      !form.header.buyerName &&
-      user
-    ) {
-      setForm(
-        (current) => ({
-          ...current,
-
-          header: {
-            ...current.header,
-
-            buyerName:
-              user.name ||
-              "",
-
-            buyerContact:
-              user.mobile ||
-              ""
-          }
-        })
-      );
-    }
-  }, [
-    editing,
-    user,
-    form.header.buyerName
-  ]);
-
-  // ===================================================
   // LOAD DEFAULT SPECIFIC TERMS
-  //
-  // If Payment Term is already selected,
-  // automatically populate Payment Terms
-  // inside Specific PO Terms.
   // ===================================================
 
   useEffect(() => {
@@ -572,9 +631,7 @@ export default function POFormPage() {
         items[index] =
           material
             ? {
-                ...items[
-                  index
-                ],
+                ...items[index],
 
                 materialId:
                   material._id,
@@ -663,9 +720,7 @@ export default function POFormPage() {
         ...current,
 
         items:
-          current.items
-            .length ===
-          1
+          current.items.length === 1
             ? [
                 emptyItem()
               ]
@@ -712,12 +767,8 @@ export default function POFormPage() {
           ...current.specificTerms
         ];
 
-        updatedTerms[
-          index
-        ] = {
-          ...updatedTerms[
-            index
-          ],
+        updatedTerms[index] = {
+          ...updatedTerms[index],
 
           text:
             value
@@ -977,6 +1028,14 @@ export default function POFormPage() {
     event.preventDefault();
 
     if (
+      !form.companyId
+    ) {
+      return toast.error(
+        "Company Master is not configured"
+      );
+    }
+
+    if (
       !form.paymentTermId
     ) {
       return toast.error(
@@ -1185,68 +1244,35 @@ export default function POFormPage() {
             <Col md={3}>
 
               <Form.Label>
-                Company *
+                Company
               </Form.Label>
 
-              <Form.Select
-                required
+              <Form.Control
+                readOnly
 
                 value={
-                  form.companyId
+                  selectedCompany
+                    ? `${
+                        selectedCompany
+                          .companyCode ||
+                        ""
+                      }${
+                        selectedCompany
+                          .companyCode &&
+                        selectedCompany
+                          .companyName
+                          ? " - "
+                          : ""
+                      }${
+                        selectedCompany
+                          .companyName ||
+                        ""
+                      }`
+                    : companies.isLoading
+                    ? "Loading company..."
+                    : "Company not configured"
                 }
-
-                onChange={(
-                  event
-                ) =>
-                  setForm({
-                    ...form,
-
-                    companyId:
-                      event
-                        .target
-                        .value
-                  })
-                }
-              >
-
-                <option value="">
-                  Select
-                </option>
-
-                {(
-                  companies
-                    .data
-                    ?.data ||
-                  []
-                ).map(
-                  (
-                    company
-                  ) => (
-
-                    <option
-                      key={
-                        company._id
-                      }
-
-                      value={
-                        company._id
-                      }
-                    >
-
-                      {
-                        company.companyCode
-                      }{" "}
-                      -{" "}
-                      {
-                        company.companyName
-                      }
-
-                    </option>
-
-                  )
-                )}
-
-              </Form.Select>
+              />
 
             </Col>
 
@@ -1654,33 +1680,7 @@ export default function POFormPage() {
 
             </Col>
 
-            <Col md={3}>
-
-              <Form.Label>
-                Currency
-              </Form.Label>
-
-              <Form.Control
-                value={
-                  form.currency
-                }
-
-                onChange={(
-                  event
-                ) =>
-                  setForm({
-                    ...form,
-
-                    currency:
-                      event
-                        .target
-                        .value
-                        .toUpperCase()
-                  })
-                }
-              />
-
-            </Col>
+            
 
           </Row>
 
@@ -1864,15 +1864,6 @@ export default function POFormPage() {
 
             </Col>
 
-            {/* =================================================
-                PAYMENT TERM
-
-                When selected:
-                1. paymentTermId changes
-                2. header.paymentSummary changes
-                3. Specific PO Terms -> Payment Terms changes
-            ================================================= */}
-
             <Col md={4}>
 
               <Form.Label>
@@ -1926,20 +1917,11 @@ export default function POFormPage() {
 
                       paymentTermId,
 
-                      // =====================================
-                      // HEADER PAYMENT
-                      // =====================================
-
                       header: {
                         ...current.header,
 
                         paymentSummary
                       },
-
-                      // =====================================
-                      // SPECIFIC PO TERMS PAYMENT
-                      // AUTO UPDATE FROM SELECTED PAYMENT
-                      // =====================================
 
                       specificTerms:
                         current.specificTerms.map(
@@ -2069,13 +2051,22 @@ export default function POFormPage() {
 
             </Col>
 
+            {/* =================================================
+                TAXES & DUTIES
+
+                Dropdown added.
+
+                Existing field name remains:
+                header.taxesDutiesText
+            ================================================= */}
+
             <Col md={4}>
 
               <Form.Label>
                 Taxes & Duties
               </Form.Label>
 
-              <Form.Control
+              <Form.Select
                 value={
                   form.header
                     .taxesDutiesText
@@ -2097,7 +2088,27 @@ export default function POFormPage() {
                     }
                   })
                 }
-              />
+              >
+
+                {TAXES_DUTIES_OPTIONS.map(
+                  (option) => (
+
+                    <option
+                      key={
+                        option
+                      }
+
+                      value={
+                        option
+                      }
+                    >
+                      {option}
+                    </option>
+
+                  )
+                )}
+
+              </Form.Select>
 
             </Col>
 
@@ -2159,38 +2170,6 @@ export default function POFormPage() {
                       ...form.header,
 
                       specialNotes:
-                        event
-                          .target
-                          .value
-                    }
-                  })
-                }
-              />
-
-            </Col>
-
-            <Col md={4}>
-
-              <Form.Label>
-                Authorized Signatory
-              </Form.Label>
-
-              <Form.Control
-                value={
-                  form.header
-                    .authorizedSignatory
-                }
-
-                onChange={(
-                  event
-                ) =>
-                  setForm({
-                    ...form,
-
-                    header: {
-                      ...form.header,
-
-                      authorizedSignatory:
                         event
                           .target
                           .value
@@ -2838,37 +2817,6 @@ export default function POFormPage() {
 
               <Row className="g-2 mb-3">
 
-                <Col xs={12}>
-
-                  <Form.Label>
-                    Rounding Off
-                  </Form.Label>
-
-                  <Form.Control
-                    type="number"
-
-                    step="0.01"
-
-                    value={
-                      form.roundingOff
-                    }
-
-                    onChange={(
-                      event
-                    ) =>
-                      setForm({
-                        ...form,
-
-                        roundingOff:
-                          event
-                            .target
-                            .value
-                      })
-                    }
-                  />
-
-                </Col>
-
               </Row>
 
               <div className="totals-box">
@@ -2897,21 +2845,6 @@ export default function POFormPage() {
                   <strong>
                     {formatMoney(
                       calc.tax,
-                      form.currency
-                    )}
-                  </strong>
-
-                </div>
-
-                <div>
-
-                  <span>
-                    Rounding Off
-                  </span>
-
-                  <strong>
-                    {formatMoney(
-                      calc.rounding,
                       form.currency
                     )}
                   </strong>
