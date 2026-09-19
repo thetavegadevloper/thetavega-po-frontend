@@ -54,6 +54,16 @@ export default function POListPage() {
 
   // =====================================================
   // LOAD PURCHASE ORDERS
+  //
+  // IMPORTANT:
+  //
+  // 1. First call normal list API.
+  // 2. For rows where approval user data is missing,
+  //    call the existing PO detail API.
+  // 3. Merge approval information into list row.
+  //
+  // This is a frontend workaround until the hosted
+  // backend list endpoint is updated.
   // =====================================================
   const q = useQuery({
     queryKey: [
@@ -61,19 +71,145 @@ export default function POListPage() {
       filters
     ],
 
-    queryFn: () =>
-      poApi.list(
-        Object.fromEntries(
-          Object.entries(filters).filter(
-            ([, value]) =>
-              value !== ""
+    queryFn: async () => {
+      // ===============================================
+      // NORMAL LIST API
+      // ===============================================
+      const listResponse =
+        await poApi.list(
+          Object.fromEntries(
+            Object.entries(
+              filters
+            ).filter(
+              ([, value]) =>
+                value !== ""
+            )
           )
-        )
-      )
+        );
+
+      const listRows =
+        listResponse?.data ||
+        [];
+
+      // ===============================================
+      // ENRICH ROWS FROM DETAIL API ONLY WHEN NEEDED
+      // ===============================================
+      const enrichedRows =
+        await Promise.all(
+          listRows.map(
+            async (po) => {
+              const status =
+                po.status;
+
+              const approval =
+                po.approval || {};
+
+              const approvedStatus =
+                [
+                  "Approved",
+                  "Issued",
+                  "Closed"
+                ].includes(
+                  status
+                );
+
+              const rejectedStatus =
+                status ===
+                "Rejected";
+
+              // =======================================
+              // DETAIL API REQUIRED?
+              //
+              // Pending rows already have submitter.
+              //
+              // For Approved / Issued / Closed:
+              // fetch detail if approvedBy missing.
+              //
+              // For Rejected:
+              // fetch detail if rejectedBy missing.
+              //
+              // Also fetch if submittedBy is missing.
+              // =======================================
+              const needsDetail =
+                !approval
+                  ?.submittedBy ||
+                (
+                  approvedStatus &&
+                  !approval
+                    ?.approvedBy
+                ) ||
+                (
+                  rejectedStatus &&
+                  !approval
+                    ?.rejectedBy
+                );
+
+              if (
+                !needsDetail
+              ) {
+                return po;
+              }
+
+              try {
+                const detailResponse =
+                  await poApi.get(
+                    po._id
+                  );
+
+                const detailPO =
+                  detailResponse
+                    ?.data;
+
+                if (!detailPO) {
+                  return po;
+                }
+
+                return {
+                  ...po,
+                  ...detailPO,
+
+                  approval: {
+                    ...approval,
+                    ...(
+                      detailPO
+                        .approval ||
+                      {}
+                    )
+                  }
+                };
+              } catch (
+                error
+              ) {
+                console.error(
+                  `[PO LIST] Unable to load approval detail for ${po.poNumber}:`,
+                  error
+                );
+
+                // Keep list working even if one
+                // detail request fails.
+                return po;
+              }
+            }
+          )
+        );
+
+      // ===============================================
+      // KEEP ORIGINAL PAGINATION ETC.
+      // ===============================================
+      return {
+        ...listResponse,
+        data:
+          enrichedRows
+      };
+    }
   });
 
+  // =====================================================
+  // DATA
+  // =====================================================
   const rows =
-    q.data?.data || [];
+    q.data?.data ||
+    [];
 
   const p =
     q.data?.pagination || {
@@ -121,13 +257,18 @@ export default function POListPage() {
   // =====================================================
   // SUBMITTED BY
   // =====================================================
-  function renderSubmittedBy(po) {
+  function renderSubmittedBy(
+    po
+  ) {
     const submittedBy =
-      po.approval?.submittedBy;
+      po.approval
+        ?.submittedBy;
 
     const submittedLevel =
-      po.approval?.submittedLevel ||
-      submittedBy?.approvalLevel ||
+      po.approval
+        ?.submittedLevel ||
+      submittedBy
+        ?.approvalLevel ||
       "";
 
     if (!submittedBy) {
@@ -141,7 +282,8 @@ export default function POListPage() {
     return (
       <div
         style={{
-          minWidth: 125
+          minWidth:
+            125
         }}
       >
         {/* NORMAL FONT */}
@@ -162,26 +304,29 @@ export default function POListPage() {
   // =====================================================
   // APPROVED / REJECTED BY
   // =====================================================
-  function renderApprovedBy(po) {
+  function renderApprovedBy(
+    po
+  ) {
     const approvedBy =
-      po.approval?.approvedBy;
+      po.approval
+        ?.approvedBy;
 
     const approvedLevel =
-      po.approval?.approvedLevel ||
-      approvedBy?.approvalLevel ||
+      po.approval
+        ?.approvedLevel ||
+      approvedBy
+        ?.approvalLevel ||
       "";
 
     // ===================================================
-    // APPROVED
-    //
-    // Also remains visible after:
-    // Approved -> Issued -> Closed
+    // APPROVED USER
     // ===================================================
     if (approvedBy) {
       return (
         <div
           style={{
-            minWidth: 125
+            minWidth:
+              125
           }}
         >
           {/* NORMAL FONT */}
@@ -200,32 +345,37 @@ export default function POListPage() {
     }
 
     // ===================================================
-    // REJECTED
+    // REJECTED USER
     // ===================================================
     if (
-      po.status === "Rejected"
+      po.status ===
+      "Rejected"
     ) {
       const rejectedBy =
-        po.approval?.rejectedBy;
+        po.approval
+          ?.rejectedBy;
 
       const rejectedLevel =
-        po.approval?.rejectedLevel ||
-        rejectedBy?.approvalLevel ||
+        po.approval
+          ?.rejectedLevel ||
+        rejectedBy
+          ?.approvalLevel ||
         "";
 
       if (rejectedBy) {
         return (
           <div
             style={{
-              minWidth: 125
+              minWidth:
+                125
             }}
           >
-            <div className="text-danger">
+            <div>
               {rejectedBy.name ||
                 "-"}
             </div>
 
-            <div className="small text-secondary">
+            <div className="small text-danger">
               {rejectedLevel
                 ? `${rejectedLevel} • Rejected`
                 : "Rejected"}
@@ -341,7 +491,6 @@ export default function POListPage() {
                   )
                 }
               >
-
                 <option value="">
                   All status
                 </option>
@@ -374,7 +523,6 @@ export default function POListPage() {
                   )
                 }
               >
-
                 <option value="">
                   All PO types
                 </option>
@@ -407,7 +555,6 @@ export default function POListPage() {
                   )
                 }
               >
-
                 <option value="">
                   Domestic / Import
                 </option>
@@ -538,12 +685,10 @@ export default function POListPage() {
                         Status
                       </th>
 
-                      {/* NEW */}
                       <th>
                         Submitted By
                       </th>
 
-                      {/* NEW */}
                       <th>
                         Approved By
                       </th>
@@ -565,9 +710,7 @@ export default function POListPage() {
                           }
                         >
 
-                          {/* ===================================
-                              PO NUMBER
-                          =================================== */}
+                          {/* PO NUMBER */}
 
                           <td>
 
@@ -585,9 +728,7 @@ export default function POListPage() {
 
                           </td>
 
-                          {/* ===================================
-                              DATE
-                          =================================== */}
+                          {/* DATE */}
 
                           <td>
 
@@ -597,9 +738,7 @@ export default function POListPage() {
 
                           </td>
 
-                          {/* ===================================
-                              VENDOR
-                          =================================== */}
+                          {/* VENDOR */}
 
                           <td>
 
@@ -617,9 +756,7 @@ export default function POListPage() {
 
                           </td>
 
-                          {/* ===================================
-                              PROJECT
-                          =================================== */}
+                          {/* PROJECT */}
 
                           <td>
 
@@ -629,9 +766,7 @@ export default function POListPage() {
 
                           </td>
 
-                          {/* ===================================
-                              PO TYPE
-                          =================================== */}
+                          {/* PO TYPE */}
 
                           <td>
 
@@ -639,9 +774,7 @@ export default function POListPage() {
 
                           </td>
 
-                          {/* ===================================
-                              GRAND TOTAL
-                          =================================== */}
+                          {/* TOTAL */}
 
                           <td className="text-end fw-semibold">
 
@@ -654,9 +787,7 @@ export default function POListPage() {
 
                           </td>
 
-                          {/* ===================================
-                              STATUS
-                          =================================== */}
+                          {/* STATUS */}
 
                           <td>
 
@@ -668,9 +799,7 @@ export default function POListPage() {
 
                           </td>
 
-                          {/* ===================================
-                              SUBMITTED BY
-                          =================================== */}
+                          {/* SUBMITTED BY */}
 
                           <td>
 
@@ -680,9 +809,7 @@ export default function POListPage() {
 
                           </td>
 
-                          {/* ===================================
-                              APPROVED BY
-                          =================================== */}
+                          {/* APPROVED BY */}
 
                           <td>
 
@@ -692,9 +819,7 @@ export default function POListPage() {
 
                           </td>
 
-                          {/* ===================================
-                              VIEW
-                          =================================== */}
+                          {/* VIEW */}
 
                           <td className="text-end">
 
